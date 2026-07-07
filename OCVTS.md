@@ -712,19 +712,66 @@ addominale, classe `NYHA`, `TTR(INR)`.
 
 ### Eventi
 
-Gli eventi combinano più fonti (ricoveri, decessi, laboratorio) in eventi clinici
-complessi; la data è tipicamente la **minima** tra gli eventi elementari.
+Gli eventi sono **endpoint compositi**: misurano il tempo al primo di un insieme di eventi
+clinici (o al decesso) dopo la data indice. MALE e MACE sono costruiti con lo **stesso
+schema**, che conviene descrivere una volta.
+
+**Lo schema comune.**
+1. **Estrazione dai ricoveri.** Si parte da `EGTASK.SDO_ETICHETTATE` (le SDO già etichettate
+   ICD‑9 dal [builder A01](#sdo--builder-a01)), in join con la coorte, tenendo **solo i
+   ricoveri successivi alla data indice** (`data_ingresso > data_indice`). Ogni tipo di
+   evento è una colonna‑etichetta 0/1 della SDO.
+2. **Data dell'evento = data di ricovero.** Per ogni evento presente, la data è la
+   `data_ingresso`; si collassa a una riga per persona/data indice tenendo la **prima** data
+   di ciascun tipo di evento.
+3. **Decesso e censura.** `data_decesso = 31dec9999` significa "nessun decesso" (censura alla
+   data amministrativa, `MORTO = 0`); una data valida dà `MORTO = 1`. `data_censura` = data
+   amministrativa se vivo, altrimenti la data di decesso.
+4. **Composito.** `data_<endpoint> = min(data_decesso, date dei singoli eventi)`; il flag
+   `<endpoint> = 1` se si è verificato **almeno un evento o il decesso**; la distanza
+   `dist = min(data_evento, data_censura) − data_indice` è il tempo di follow‑up in giorni.
+
+```mermaid
+flowchart LR
+  sdo[(SDO_ETICHETTATE)]:::l1 --> J{{join coorte<br/>ricovero DOPO data_indice}}:::tf --> ev[eventi elementari<br/>data = data_ingresso]:::l2
+  dec[(anagrafe decesso)]:::l0 --> MIN
+  ev --> FIRST{{prima data<br/>per tipo evento}}:::tf --> MIN{{data = min eventi + decesso<br/>flag 0/1 · distanza da indice}}:::tf
+  MIN --> OUT[male / mace3 / mace5<br/>data + flag + dist]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
 #### MALE
 
-**Major Adverse Limb Event** — evento avverso maggiore agli arti. Output: `male` (0/1),
-`data_male`, `distmale`.
+**Major Adverse Limb Event** — eventi maggiori agli arti inferiori più il decesso.
+Componenti: amputazione arti inferiori (`EVENTO_AMPUTAZ`), rivascolarizzazione arti
+inferiori (`EVENTO_RIVASC`), evento ischemico/trombotico (`EVENTO_ISCHTROM`).
+
+`data_male = min(decesso, amputazione, ischemico, rivascolarizzazione)`;
+`male = 1` se almeno una componente o il decesso. Output: `male`, `data_male`, `distmale`.
 
 #### MACE 3p e 5p
 
-**Major Adverse Cardiovascular Event** a 3 e 5 punti; `data_mace3` è la minima tra decesso,
-infarto e stroke (la 5p aggiunge ulteriori componenti). Output: `mace3`, `mace5`,
-`data_mace3`, `data_mace5`, `dist3pi`, `dist5pi`.
+**Major Adverse Cardiovascular Event**, in due definizioni.
+
+- **3‑point (classico):** infarto miocardico acuto (`EVENTO_IMA`), ictus (`EVENTO_STROKE`)
+  e decesso.
+  `data_mace3 = min(decesso, IMA, stroke)`; `mace3 = 1` se IMA o stroke o decesso.
+- **5‑point:** aggiunge scompenso ospedalizzato (definizione PNE, `EVENTO_SCC`), bypass
+  aortocoronarico (`EVENTO_BAC`) e angioplastica coronarica (`EVENTO_PTCA`).
+  `data_mace5 = min(decesso, IMA, stroke, scompenso, bypass, angioplastica)`; `mace5 = 1`
+  se una qualsiasi di queste o il decesso.
+
+Output: `mace3`, `mace5`, `data_mace3`, `data_mace5`, `dist3pi`, `dist5pi`.
+
+| Endpoint | Componenti (oltre al decesso) |
+|---|---|
+| **MALE** | amputazione, rivascolarizzazione AAII, evento ischemico/trombotico |
+| **MACE 3p** | infarto (IMA), ictus (stroke) |
+| **MACE 5p** | infarto, ictus, scompenso (PNE), bypass (BAC), angioplastica (PTCA) |
 
 #### Eventi di ricovero
 
@@ -736,16 +783,6 @@ scompenso, valvole, ASCVD multisito.
 
 Eventi emorragici rilevanti, distinti per tipo (macro `accoda_emod`). Output: `emomag_a`,
 `emomag_f`, `data_emomag_a`, `data_emomag_f`.
-
-```mermaid
-flowchart LR
-  sdo[(SDO / DNLAB / anagrafe)]:::l0 --> EV{{eventi elementari<br/>infarto/stroke/decesso...}}:::tf --> comp[componenti evento]:::l2
-  comp --> MIN{{data = min componenti}}:::tf --> OUT[mace/male/eventi_ric/emomag]:::out
-  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
-  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
-  classDef tf fill:#ececec,stroke:#777,color:#111;
-  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
-```
 
 ### Prestazioni
 
