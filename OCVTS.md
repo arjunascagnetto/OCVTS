@@ -1192,26 +1192,62 @@ la **terapia registrata in C@rdioNet**.
 
 #### <ins>Terapia farmaceutica</ins>
 
-Terapia farmaceutica territoriale agganciata alla coorte, costruita sopra le macro‑classi
-`dsfarma_*` del [builder FARMATERR](#farmaceutica-territoriale--builder-farmaterr), con
-finestre temporali **diverse per protocollo**:
+La terapia farmaceutica territoriale **non è una singola variabile** ma un blocco
+**composito**: dalle macro‑classi `dsfarma_*` del
+[builder FARMATERR](#farmaceutica-territoriale--builder-farmaterr) si costruiscono più
+componenti, con finestre temporali diverse per protocollo. Il mattone comune (`build_farma`)
+aggancia la coorte a `DSFARMA_<classe>` in una finestra ampia (CLINICO:
+`data_indice − 365 … data_indice + 730`); da lì si derivano i pezzi.
 
-- **CLINICO:** `data_indice − 90 ≤ data_prescrizione ≤ data_indice + 180`. Output: potenza
-  ipolipemizzanti (indice e follow‑up, incl. PCSK9/inclisiran), somma prescrizioni a 6/12
-  mesi per classe, flag classe follow‑up 6 mesi / anamnesi 3 mesi.
-- **PDTA:** `data_uscita_indice ≤ data_prescrizione ≤ data_uscita_indice + 730`. Output:
-  somma copertura annua per classe, flag 0/1 di classe, `last_AA/ASA/NAOTAO`, somma ATC per
-  persona.
-- **EPI4M:** `data_indice ≤ data_prescrizione ≤ data_indice + 365`. Output: potenza
-  ipolipemizzanti (indice `−365..0`, follow‑up `+270..+360`), somma grezza ATC.
+**Componenti (protocollo CLINICO).**
 
-Output: `farmaceutica` (tra le trattenute: `PCSK9I`, `INCLISIRAN`).
+1. **Potenza ipolipemizzante.** Gli ipolipemizzanti — territoriali **più** quelli
+   aziendali (`ipolipo_azienda`) — sono scomposti in cinque componenti: **statine** (STA),
+   **ezetimibe** (EZE), **acido bempedoico** (BEM), **inclisiran** (INC) e **PCSK9‑inibitori**
+   (PCS, gli "‑cumab"). Per le statine la potenza dipende dalla **quantità** a scaglioni
+   (≤ 5 / 5–15 / 15–30 / 30–60 / > 60). La potenza complessiva è calcolata **all'indice**
+   (finestra `−90 … +180`) e al **follow‑up** (`potenza_fup`): il valore più vicino all'LDL
+   preso a **1 anno** dalla data indice; se non c'è, la potenza più vicina a 12 mesi.
+2. **Somme per classe a 6 e 12 mesi** (`somma6fup`, `somma12fup`): numero di prescrizioni per
+   persona/indice/classe nelle due finestre.
+3. **Costo a 12 mesi** (`costo12fup`).
+4. **Flag di classe** — uso della classe nel **follow‑up a 6 mesi** (`farmafup6mesi`) e in
+   **anamnesi a 3 mesi** (`farma3anam`), come 0/1.
+
+Il dataset finale (`clinico.&nome._farmaceutica`) **unisce** coorte + `farma3anam` +
+`farmafup6mesi` + `potenza_indice` + `potenza_fup` + `somma6fup` + `somma12fup` +
+`costo12fup`, e trattiene le classi trovate (`lista_found`), le `somma*`, i `costo*` e la
+`potenza_d365`. Nel datamart, tra le variabili trattenute: `PCSK9I`, `INCLISIRAN`.
+
+**Finestre e output per protocollo.**
+
+- **CLINICO** — potenza ipolipemizzanti `−90 … +180`; somme e flag a 6/12 mesi e anamnesi 3
+  mesi (come sopra).
+- **PDTA** — `data_uscita_indice … +730`: somma della **copertura annua per classe**, flag
+  0/1 di classe, `last_AA` / `last_ASA` / `last_NAOTAO` (ultima prescrizione di
+  antiaggreganti/ASA/anticoagulanti), somma ATC per persona.
+- **EPI4M** — `data_indice … +365`: potenza ipolipemizzanti (indice `−365 … 0`, follow‑up
+  `+270 … +360`), somma grezza degli ATC per persona.
 
 ```mermaid
 flowchart LR
-  dsf[(dsfarma_* / cardio_terapia)]:::l1 --> W{{finestra per protocollo<br/>CLINICO -90..+180<br/>PDTA 0..+730<br/>EPI4M 0..+365}}:::tf
-  W --> AGG{{somma/copertura per classe<br/>potenza ipolipemizzanti}}:::tf --> OUT[farmaceutica / terapiacardionet]:::out
+  dsf[(dsfarma_&lt;classe&gt;)]:::l1 --> BF{{build_farma: join coorte<br/>finestra ampia per classe}}:::tf
+  azi[(ipolipo aziendale)]:::l1 --> POT
+  BF --> POT{{potenza ipolipemizzante<br/>STA/EZE/BEM/INC/PCS<br/>statina per quantita}}:::tf
+  BF --> SUM{{somme per classe<br/>6 e 12 mesi}}:::tf
+  BF --> COST{{costo 12 mesi}}:::tf
+  BF --> FLAG{{flag classe<br/>fup 6 mesi · anamnesi 3 mesi}}:::tf
+  POT --> P1[potenza indice + fup]:::l2
+  SUM --> P2[somma6/12 per classe]:::l2
+  COST --> P3[costo 12 mesi]:::l2
+  FLAG --> P4[flag classe]:::l2
+  P1 --> M{{merge per key_anagrafe, data_indice}}:::tf
+  P2 --> M
+  P3 --> M
+  P4 --> M
+  M --> OUT[farmaceutica<br/>classi + somme + costi + potenza]:::out
   classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
   classDef tf fill:#ececec,stroke:#777,color:#111;
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
