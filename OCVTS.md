@@ -663,19 +663,35 @@ respiratori, tutti agganciati alla coorte.
 #### Laboratorio
 
 **Definizione.** Aggancia alla coorte gli esami costruiti dal [builder
-B0](#esami-di-laboratorio--builder-b0), tenendo il valore **più vicino alla data indice**
-(finestra dal 2005 alla fine del follow‑up, risultati non mancanti; macro `get_lab`).
+B0](#esami-di-laboratorio--builder-b0) e ne deriva gli indicatori clinici (GFR, classi
+renali, KDIGO).
 
-**Output (14 su 38 trattenute).** `GFR_CKDEPI`, `GFR_BIS1`, `LAB_ACR`, `LAB_AER`,
-`LAB_ALBUMINA`, `LAB_BNP`, `LAB_COL`, `LAB_CRCL`, `LAB_CREATININA`, `LAB_EMOGLOBINA`,
-`LAB_GLICEMIA`, `LAB_HBGLICATA`, `LAB_HDL`, `LAB_LDL`. Gli altri (PCR, PER, MALBU, PROTU,
-elettroliti, funzione epatica, ferro, TSH, troponina, …) sono calcolati ma non trattenuti
-di default.
+**Costruzione.** Per ogni esame, la macro `buildesamiD`/`buildesamiC` fa il join
+`coorte × ESAMI.esami_<esame>` tenendo i prelievi nella finestra **`data_indice − 365 …
+data_indice + 90`** giorni, con risultato non mancante. Per ciascun prelievo calcola la
+distanza dall'indice (`DISTGG`), la posizione `IPP` (0 = stesso giorno, 1 = precedente,
+2 = successivo) e la distanza assoluta; ordina per `IPP` poi distanza e tiene il **primo
+per data indice** → il valore più vicino all'indice, con priorità **stesso giorno →
+precedente → successivo**. Ne risultano `LAB_<esame>` e `LAB_DATA_<esame>`.
+
+**Assemblaggio e variabili derivate.** Tutti gli esami (più la lipoproteina(a), presa al
+prelievo a distanza minima) sono uniti alla coorte; poi si calcolano: età, **GFR** con
+CKD‑EPI (`%GFR_simple`) e BIS1 (`%BIS1`), la classe di funzione renale (`%classe_gfr`), le
+classi di proteinuria per ciascun marcatore (`%classe_protu/malbu/acraer/pcrper` +
+`%classe_proteinuria`), la griglia **KDIGO 2014** (`%kdigo14`) e il colesterolo non‑HDL
+(`LAB_CnotHDL = LAB_COL − LAB_HDL`).
+
+**Output.** `clinico.&nome._laboratorio` — 14 variabili trattenute su 38: `GFR_CKDEPI`,
+`GFR_BIS1`, `LAB_ACR`, `LAB_AER`, `LAB_ALBUMINA`, `LAB_BNP`, `LAB_COL`, `LAB_CRCL`,
+`LAB_CREATININA`, `LAB_EMOGLOBINA`, `LAB_GLICEMIA`, `LAB_HBGLICATA`, `LAB_HDL`, `LAB_LDL`.
+Gli altri (PCR, PER, MALBU, PROTU, elettroliti, funzione epatica, ferro, TSH, troponina, …)
+sono calcolati ma non trattenuti di default.
 
 ```mermaid
 flowchart LR
-  dnlab[(DNLAB per esame)]:::l0 --> B0{{builder B0<br/>accodalab per anno<br/>key diverso 0, non missing}}:::tf --> esami[esami_&lt;esame&gt;]:::l1
-  esami --> GL{{get_lab: join coorte<br/>2005..fine_fup<br/>piu vicino a data indice}}:::tf --> lab[LAB_&lt;esame&gt; / GFR]:::out
+  dnlab[(DNLAB per esame)]:::l0 --> B0{{builder B0<br/>accodalab per anno}}:::tf --> esami[esami_&lt;esame&gt;]:::l1
+  esami --> BE{{buildesami: join coorte<br/>-365..+90 gg, non missing<br/>primo per IPP: stesso&gt;pre&gt;post}}:::tf --> merge{{merge esami + coorte<br/>GFR CKD-EPI/BIS1<br/>classi renali + KDIGO 2014}}:::tf
+  merge --> OUT[LAB_&lt;esame&gt; / GFR_CKDEPI<br/>classe_gfr / kdigo]:::out
   classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
   classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
   classDef tf fill:#ececec,stroke:#777,color:#111;
@@ -684,31 +700,101 @@ flowchart LR
 
 #### ECO ed ECG
 
-Esami strumentali cardiologici estratti da C@rdioNet: **ecocardiografia** (ECO) ed
-**elettrocardiografia** (ECG), agganciati alla coorte. Il catalogo è ampio (113 variabili
-ECO, 17 ECG) e la selezione delle misure è specifica dello studio. Fonti:
-`vfp_cardio_eco`, `vfp_cardio_ecg_mortara`.
+**Definizione.** Esami strumentali cardiologici da C@rdioNet: **ecocardiografia** (ECO, da
+`DWTSISSR.VFP_CARDIO_ECO`) ed **elettrocardiografia** (ECG, da
+`DWTSISSR.VFP_CARDIO_ECG_MORTARA`). Costruiti con lo stesso schema.
 
-> ⚠︎ **Limite.** Nessuna macro dedicata: la selezione è inline nel flusso ECO/ECG.
+**Costruzione.** L'esame è estratto in tre finestre temporali rispetto all'indice —
+**PRE** (`data_indice − 365 … data_indice`), INTRA e POST — e unito; si tiene il **primo
+per data indice** (priorità PRE), calcolando `data_eco`/`data_ecg` e la distanza
+`dist_eco`/`dist_ecg`. Infine un passo **guidato da dizionario** (`data _null_` sulla lista
+`veco`/`vecg` delle variabili da tenere, con eventuale rinomina) costruisce dinamicamente
+una `PROC SQL` che riaggancia la sorgente C@rdioNet (`key_eco_cardio` / `key_ecg_mortara`)
+per portare **tutte le misure selezionate** nell'output.
+
+**Output.** `clinico.&nome._eco` (catalogo 113 variabili) e `clinico.&nome._ecg` (17). La
+selezione delle misure è specifica dello studio (lista `veco`/`vecg`).
+
+```mermaid
+flowchart LR
+  src[(VFP_CARDIO_ECO / ECG_MORTARA)]:::l0 --> W{{join coorte<br/>finestre PRE/INTRA/POST<br/>-365 gg .. indice}}:::tf --> pick{{primo per indice<br/>data_eco / dist_eco}}:::tf
+  pick --> D{{data _null_ dizionario<br/>lista veco/vecg + rinomina<br/>join per key_eco_cardio}}:::tf --> OUT[coorte eco / ecg<br/>misure selezionate]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
 #### Spirometrie
 
-Esami di funzionalità respiratoria ricavati dai flussi ambulatoriale e delle prestazioni
-sanitarie (`vfp_ambulatoriale_prestaz_`, macro `accoda_spiro*`), accodati per anno.
+**Definizione.** Esami di funzionalità respiratoria dal flusso ambulatoriale.
+
+**Costruzione.** Si selezionano dal dizionario prestazioni (`VDIZIONARIO_PRESTAZIONI`) i
+codici la cui descrizione **contiene "SPIRO"**; la macro `accoda_anni_spyro` accoda, anno
+per anno, le prestazioni ambulatoriali (`VFP_AMBULATORIALE_PRESTAZ_<anno>`) con quei codici
+e `key_anagrafe ≠ 0`, tenendo la `data_prestazione`. Il risultato è unito alla coorte e,
+ordinando per data decrescente, si tiene la spirometria **più recente per data indice**.
+
+**Output.** `clinico.&nome._spirometrie`.
+
+```mermaid
+flowchart LR
+  diz[(VDIZIONARIO_PRESTAZIONI<br/>desc contiene SPIRO)]:::l0 --> SEL{{codici prestazione spiro}}:::tf
+  amb[(VFP_AMBULATORIALE_PRESTAZ<br/>per anno)]:::l0 --> ACC{{accoda_anni_spyro<br/>key diverso 0}}:::tf
+  SEL --> ACC --> M{{merge coorte<br/>piu recente per indice}}:::tf --> OUT[coorte spirometrie]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
 #### Fenotipo
 
-Fenotipizzazione morfologica cardiaca da C@rdioNet (ecocardiografia morfologica): variabili
-descrittive della struttura cardiaca agganciate alla coorte. Fonti: `vfp_cardio_eco`,
-`vfp_cardio_eco_morfologica`.
+**Definizione.** Classificazione del **fenotipo di scompenso** in base alla frazione di
+eiezione ventricolare sinistra (LVEF), da ecocardiografia C@rdioNet (`VFP_CARDIO_ECO`) e
+dall'eco morfologica (`VFP_CARDIO_ECO_MORFOLOGICA`, con dizionario `DIZIONARIO_ECOMORF`).
+
+**Costruzione.** Il fenotipo è assegnato così: **REF** (*reduced*, ridotta) se LVEF < 50;
+**PEF** (*preserved*, conservata) se LVEF ≥ 50; se la LVEF manca si usa il fallback
+morfologico/descrittivo; altrimenti **NN** (non classificabile). Si tiene il fenotipo
+peggiore nel tempo e si calcolano la LVEF pre‑indice **minima, massima e ultima** con le
+rispettive date (`min/max/last_lvef_prealltime`) e l'anno dell'ultima LVEF.
+
+**Output.** `clinico.&nome._fenotipo` — `fenotipo`, `lvef_incidenza`, LVEF pre‑indice
+min/max/last con date, `anno_lvef`.
+
+```mermaid
+flowchart LR
+  eco[(VFP_CARDIO_ECO<br/>LVEF)]:::l0 --> CL{{fenotipo da LVEF<br/>REF &lt;50 · PEF &gt;=50 · NN}}:::tf
+  morf[(VFP_CARDIO_ECO_MORFOLOGICA<br/>dizionario ecomorf)]:::l0 --> CL
+  eco --> LV{{LVEF pre-indice<br/>min / max / last}}:::tf
+  CL --> OUT[coorte fenotipo<br/>fenotipo + LVEF min/max/last]:::out
+  LV --> OUT
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
 #### Parametri funzionali
 
-Parametri funzionali e clinici da C@rdioNet (`vfp_cardio_paramfunz`). Catalogo molto ampio
-(574 variabili); tra i trattenuti: `PAS`, `PAD`, `FC`, `SO2`, peso, altezza, circonferenza
-addominale, classe `NYHA`, `TTR(INR)`.
+**Definizione.** Parametri clinico‑funzionali da C@rdioNet (`VFP_CARDIO_PARAMFUNZ`):
+pressione, frequenza, antropometria, classe NYHA, saturazione, INR, ecc.
 
-> ⚠︎ **Limite.** La ricetta di selezione non è in una macro dedicata.
+**Costruzione.** La selezione è guidata dalla tabella `SELEZIONE_PARAMETRI_FUNZIONALI`
+(righe con `TENERE = 1`, con `VARIABILE`, `ORDINE`, `NUOVO_NOME`, `TIPO`). I parametri —
+separati in **alfanumerici** e **numerici** — vengono **trasposti** (`PROC TRANSPOSE`,
+`ID = CAR_PFUN_DESCRIZIONE`): ogni descrizione di parametro diventa una **colonna** per
+persona/data indice, con l'eventuale rinomina.
+
+**Output.** `clinico.&nome._parametri_funzionali` — catalogo 574 variabili, ~10 trattenute:
+`PAS`, `PAD`, `FC`, `SO2`, peso, altezza, circonferenza addominale, classe `NYHA`, `TTR(INR)`.
+
+```mermaid
+flowchart LR
+  pf[(VFP_CARDIO_PARAMFUNZ)]:::l0 --> SEL{{selezione TENERE=1<br/>variabile/ordine/nuovo_nome}}:::tf
+  SEL --> TR{{transpose per indice<br/>alfanumerici + numerici<br/>parametro -&gt; colonna}}:::tf --> OUT[coorte parametri_funzionali<br/>PAS/PAD/FC/NYHA/...]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
 ### Eventi
 
