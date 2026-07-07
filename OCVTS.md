@@ -1,16 +1,39 @@
 # OCVTS — Documentazione del Repository
 
-> Documentazione del sistema OCVTS (Osservatorio Cardiovascolare del Friuli Venezia
-> Giulia). Il documento è organizzato in tre parti, con vista **top‑down** (dal generale
-> al particolare):
-> **Introduzione** (cos'è il repository, le fonti, i livelli dati, i protocolli) ·
-> **Builders** (come dai dati grezzi L0 si costruiscono le aggregazioni L1–L2) ·
-> **Datamart** (come le variabili L0–L4 diventano le colonne che vedete nella coorte).
->
-> I flussi sono ricostruiti **staticamente** dalla pipeline di lineage (senza accesso al
-> server SAS). Dove la ricetta non è catturabile staticamente è indicato con una nota
-> **⚠︎ Limite**. Ogni capitolo dei builder e del datamart apre con un **diagramma di
-> flusso** semplificato (nomi leggibili, filtri sintetizzati, colori per livello).
+## README
+
+**Cos'è questo documento.** È il manuale di dominio del sistema **OCVTS** (Osservatorio
+Cardiovascolare del Friuli Venezia Giulia). Spiega **come** — a partire dai dati grezzi del
+Repository Epidemiologico Regionale (RER) — vengono costruite le variabili cliniche ed
+epidemiologiche usate negli studi: dalle diagnosi integrate agli esami, dagli eventi agli
+score e alle terapie.
+
+**Com'è organizzato.** Tre parti, in ordine **top‑down** (dal generale al particolare):
+
+1. **Introduzione** — cos'è il RER, le fonti, i livelli dati L0–L4 e i tre protocolli di
+   studio (CLINICO, PDTA, EPI4M).
+2. **Builders** — come dai dati grezzi **L0** si costruiscono le aggregazioni **L1 → L2**:
+   tabelle "master" (SDO, C@rdioNet, diagnosi aggregate, esami di laboratorio, classi
+   farmacologiche, dizionari) riusabili da tutti gli studi.
+3. **Datamart** — come le variabili L0–L4 diventano le **colonne finali della coorte**:
+   diagnosi integrate, esami, eventi, prestazioni, score e terapia.
+
+Usa il **Sommario** qui sotto per saltare direttamente a una sezione.
+
+**Come leggere.**
+- I dati sono raffinati in livelli, da **L0** (grezzo RER) a **L4** (classi di rischio); ogni
+  livello consuma il precedente.
+- Ogni capitolo dei builder e del datamart apre con un **diagramma di flusso** semplificato:
+  le **tabelle** sono colorate per livello, le **trasformazioni** (DATA step / PROC) sono
+  esagoni grigi con dentro i filtri; le finestre temporali sono sugli archi. La legenda dei
+  colori è in *[Come leggere i diagrammi](#come-leggere-i-diagrammi)*.
+- I nomi coorte‑specifici sono scritti senza il prefisso `&nome.` (es. `integrata_irc` sta
+  per `libout.&nome._integrata_irc`).
+- La nota **⚠︎ Limite** segnala i punti in cui la ricetta non è ricostruibile staticamente.
+
+**Come è stato generato.** Il contenuto è ricostruito **staticamente** dalla pipeline di
+lineage sugli EGP e sui codici SAS del repository di produzione, **senza** accesso al server
+SAS. Formule, filtri, soglie e liste di variabili sono estratti dal **codice reale**.
 
 ## Sommario
 
