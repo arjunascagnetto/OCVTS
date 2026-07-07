@@ -70,10 +70,11 @@
     - [Terapia C@rdioNet](#terapia-crdionet)
   - [Le due viste del datamart](#le-due-viste-del-datamart)
 - [Note di copertura](#note-di-copertura)
-
 ---
 
 ## Introduzione
+
+---
 
 ### Il RER
 
@@ -101,6 +102,8 @@ esterne di collegamento: tutte sono unite esclusivamente mediante la `key_anagra
 Questo implica che, per caratterizzare un individuo in un determinato momento, è
 necessario definire regole temporali per correlare le informazioni provenienti dalle
 diverse tabelle.
+
+---
 
 ### I dati e i livelli L0–L4
 
@@ -144,6 +147,8 @@ come le diagnosi integrate, sono costruite **solo per la coorte** in esame — u
 compromesso tra spazio nel RER e tempi di calcolo (es. l'etichettatura dei ricoveri
 richiede ~6 ore in versione non parallelizzata).
 
+---
+
 ### I protocolli
 
 Esistono tre prototipi di studio, chiamati protocolli:
@@ -161,6 +166,8 @@ outcome. Le variabili L1–L4 possono essere aggiunte in modo semi‑automatico:
 seleziona, tramite un foglio Excel strutturato, quali variabili includere, come
 rinominarle e in che ordine disporle nel datamart finale.
 
+---
+
 ### Le variabili standard
 
 Classi di variabili già pronte. Per i protocolli PDTA ed EPI4M la selezione è fissa; per
@@ -176,6 +183,8 @@ il protocollo CLINICO il referente sceglie cosa trattenere.
 * **score** — Charlson, ESC, SCORE2, SCOREC, classi di rischio cardiovascolare
 * **terapia** — farmaceutica, terapia C@rdioNet
 
+---
+
 ### Obiettivi dell'OCVTS
 
 - Definizione di **coorti epidemiologiche** nella popolazione del FVG per analizzare
@@ -186,6 +195,8 @@ il protocollo CLINICO il referente sceglie cosa trattenere.
 - **Integrazione sistematica** di fonti eterogenee, incluse quelle non strutturate (segnali
   ECG, immagini ecocardiografiche), per arricchire i fattori prognostici e migliorare la
   stratificazione del rischio.
+
+---
 
 ### Profondità temporale delle tabelle
 
@@ -202,6 +213,8 @@ precedente. Le **esenzioni** non sono aggregate per anno: la data minima di aper
 un'esenzione è il 1/1/1900. La tabella **DIAGNOSI** di C@rdioNet è una monotabella (data di
 creazione 1/1/1960, insignificante); come per le esenzioni, la data di prima apertura di
 una diagnosi è il 1/1/1900 (nei documenti si indica convenzionalmente 1/11/2009).
+
+---
 
 ### Come leggere i diagrammi
 
@@ -233,6 +246,8 @@ flowchart LR
 | viola | **L4** | classi di rischio / score |
 | grigio | trasf. | DATA step / PROC (esagono, con i filtri) |
 | arancio | output | variabile finale nel datamart della coorte |
+
+---
 
 ### La regola della diagnosi integrata
 
@@ -294,6 +309,8 @@ flowchart LR
   classDef tf  fill:#ececec,stroke:#777,color:#111;
 ```
 
+---
+
 ### SDO — builder A01
 
 **Definizione.** Etichetta ogni ricovero (SDO) con le categorie diagnostiche ICD‑9
@@ -314,6 +331,8 @@ rilevanti, secondo il dizionario `DIZIONARIO.xlsx` (foglio ICD9).
 **Output.** `egtask.sdo_generica`, `egtask.sdo_etichettate` e le versioni partizionate
 `sdo.sdo_single1..10` (per parallelizzare l'etichettatura).
 
+---
+
 ### Diagnosi C@rdioNet — builder A02
 
 **Definizione.** Classifica le diagnosi della cartella cardiologica per **descrizione,
@@ -326,6 +345,8 @@ C@rdioNet è una monotabella senza chiavi esterne: l'unico legame è la `key_ana
 (foglio CARDIO di `DIZIONARIO.xlsx`), es. "OBESITÀ" con gradi lieve/moderato/severo.
 
 **Output.** `egtask.etichette_cardionet`.
+
+---
 
 ### Diagnosi aggregate — builder A03
 
@@ -353,6 +374,8 @@ flowchart LR
   classDef tf  fill:#ececec,stroke:#777,color:#111;
 ```
 
+---
+
 ### Esami di laboratorio — builder B0
 
 **Definizione.** Aggrega i molti codici DNLAB che identificano lo **stesso esame** in una
@@ -372,6 +395,8 @@ conversione di unità di misura; esami multi‑fase o già uniti al laboratorio 
 esami includono: `acr, aer, pcr, per, malbu, protu, creatinina, gfr, emoglobina, hbglicata,
 glicemia, col, hdl, ldl, tri, bnp, probnp, albumina, calcio, fosforo, potassio, sodio, urea,
 uricemia, ferritina, ferro, transferrina, got, gpt, tsh, troponinaHS, ematocrito, …`.
+
+---
 
 ### Farmaceutica territoriale — builder FARMATERR
 
@@ -413,12 +438,16 @@ stesso progetto, variando solo la macroclasse da costruire. Colonne in output:
 11. **copertura** — giorni di copertura = pezzi × DDD (num)
 12. **anno_prestazione** — anno di erogazione (num)
 
+---
+
 ### Dizionari costruiti
 
 Tabelle di reference L1 costruite dai builder e usate a valle (selezioni, codifiche):
 `diz.selezione_prestazioni`, `diz.statine_dosaggi`, `diz.tabella_codifica_esami`,
 `diz.ESAMI_LABORATORIO` (il dizionario che guida il loop degli esami). Sono lette, mai
 prodotte dalla produzione.
+
+---
 
 ### Builder delle diagnosi integrate — D01
 
@@ -440,6 +469,8 @@ tabelle master dei builder + il grezzo RER e produce un output coorte‑specific
 `libout.&nome._<x>`. Le sei famiglie: **diagnosi, esami, eventi, prestazioni, score,
 terapia**.
 
+---
+
 ### Diagnosi
 
 Ogni scheda istanzia la [regola della diagnosi integrata](#la-regola-della-diagnosi-integrata):
@@ -447,7 +478,7 @@ merge delle fonti per `key_anagrafe`, `data_integrata_<x> = min(fonti)`, variabi
 `<x>_from`. L'output nel datamart è la coppia `integrata_<x>` (0/1) e `data_integrata_<x>`.
 Le diagnosi aggregate a monte sono costruite dal [builder A03](#diagnosi-aggregate--builder-a03).
 
-#### IRC
+#### <ins>IRC</ins>
 
 **Insufficienza renale cronica.** Integrata da: esenzione (codice `023`, patologia `585`),
 dialisi, marcatori di laboratorio della funzione renale e della proteinuria, e diagnosi
@@ -487,7 +518,7 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### Diabete
+#### <ins>Diabete</ins>
 
 **Diabete mellito.** Integrato da: esenzione (`013`), emoglobina glicata elevata, terapia
 antidiabetica (macro‑classe AMA/DIABETE) e diagnosi aggregata `diag_CM_DM`. La data
@@ -514,17 +545,31 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### Scompenso
+#### <ins>Scompenso</ins>
 
-**Scompenso cardiaco cronico (SCC).** Integrato da esenzione, terapia specifica dello
-scompenso, ricoveri con codici ICD‑9 secondo la definizione **PNE** (via diagnosi
-aggregate) e diagnosi C@rdioNet. La data integrata è la minima tra le fonti; `scc_from` ne
-indica l'origine. Output: `integrata_scc`, `data_integrata_scc`.
+**Scompenso cardiaco cronico (SCC).** Integrato da **tre** fonti (nessun farmaco):
+- **SDO** — ricoveri con `ICD9_CV_SCCPNE_ANA = 1` (scompenso secondo la definizione
+  **PNE**), prima data (`data_scc_dasdo`);
+- **esenzione** — codice `021`, prima data (`data_scc_daesenz`);
+- **C@rdioNet** — etichetta cardionet `SCC = 1`, prima data (`data_scc_dacardio`).
 
-> ⚠︎ **Limite.** La ricetta è inline (nessuna macro dedicata): codici e soglie esatti da
-> leggere nel flusso `SCOMPENSO` / `SCCxPDTAL`.
+`data_integrata_scc = min(cardionet, esenzione, sdo)`; `scc_from` = `sdo` / `car` / `ese`;
+il soggetto è affetto se `1jan1900 ≤ data_integrata_scc < data_indice`. Output:
+`integrata_scc`, `data_integrata_scc`.
 
-#### BPCO
+```mermaid
+flowchart LR
+  sdo[(SDO_ETICHETTATE<br/>SCCPNE_ANA=1)]:::l1 --> MIN{{merge coorte<br/>min-date + scc_from}}:::tf
+  ese[(esenzione 021)]:::l0 --> MIN
+  car[(cardionet SCC=1)]:::l1 --> MIN
+  MIN --> OUT[integrata_scc]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
+#### <ins>BPCO</ins>
 
 **Broncopneumopatia cronica ostruttiva.** È l'esempio **esteso** dello schema della
 diagnosi integrata, con tutti i dataset intermedi.
@@ -574,7 +619,7 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### COVID
+#### <ins>COVID</ins>
 
 **Infezione da SARS‑CoV‑2.** Integrata dalle segnalazioni/tamponi COVID ed eventuali
 ricoveri correlati. Output: `integrata_covid`, `data_integrata_covid` (variabili non
@@ -583,67 +628,54 @@ trattenute di default nel datamart).
 > ⚠︎ **Limite.** Materiale scarso: nessuna versione L3 master; la ricetta (fonti/finestre)
 > è inline nel flusso COVID.
 
-#### Fibrillazione atriale
+#### <ins>Fibrillazione atriale</ins>
 
-**FA.** Integrata da esenzione, terapia anticoagulante, diagnosi aggregata di FA e diagnosi
-C@rdioNet. La data integrata è la minima tra le fonti; `fa_from` ne indica l'origine.
-Output: `integrata_fa`, `data_integrata_fa`.
+**FA.** Integrata da **quattro** fonti (senza esenzione né farmaci): il **referto ECG**
+(FA rilevata all'elettrocardiogramma), la **C@rdioNet** (etichetta `FA = 1`, prima data),
+il **pronto soccorso** (episodio PS con diagnosi di FA) e le **SDO** (`ICD9_CV_FA = 1`).
 
-#### Ipertensione
-
-**Ipertensione arteriosa.** Integrata da esenzione, terapia antipertensiva, valori pressori
-(parametri funzionali C@rdioNet) e diagnosi aggregata. Output: `integrata_ipertensione`,
-`data_integrata_ipertensione`.
-
-#### Dislipidemia
-
-**Dislipidemia.** Integrata da esenzione, terapia ipolipemizzante e marcatori lipidici
-(colesterolo totale, LDL). Output: `integrata_dislipidemia`, `data_integrata_dislipidemia`.
-
-#### Anemia
-
-**Anemia.** Integrata da emoglobina sotto soglia, diagnosi aggregata `diag_CM_ANEMIA`
-(ICD‑9 280–285) ed esenzione. Output: `integrata_anemia`, `data_integrata_anemia`.
-
-#### Rischio CVMA
-
-**Rischio cardiovascolare / malattia aterosclerotica.** A differenza delle altre, è una
-variabile di **livello L4** costruita nel flusso delle classi di rischio, non una diagnosi
-ricavata direttamente dalle fonti L0. Output: `integrata_rcvma`, `data_integrata_rcvma`.
-
-> ⚠︎ **Limite.** La catena non risale a L0 (parte da classi di rischio già calcolate).
-
-#### Ipercolesterolemia familiare
-
-**Ipercolesterolemia familiare.** Integrata da valori di LDL molto elevati, terapia
-ipolipemizzante potente (incluse PCSK9 e inclisiran) e criteri clinici/diagnostici. Output:
-`integrata_ipercolfam`, `data_integrata_ipercolfam`.
-
-#### Microalbuminuria
-
-**Microalbuminuria.** Definita dal marcatore urinario con soglia **dipendente dall'unità di
-misura** (macro `%microalb`): ≥ 3 mg/24h, ≥ 2 mg/dL, ≥ 20 mg/L, ≥ 30 mg/g → positiva.
-Output: `integrata_microalbuminuria`, `data_integrata_microalbuminuria`.
-
-#### Obesità
-
-**Obesità.** Integrata da antropometria/BMI (parametri funzionali C@rdioNet: peso, altezza,
-circonferenza addominale, con gradi lieve/moderato/severo) e diagnosi. Output:
-`integrata_obesita`, `data_integrata_obesita`.
-
-#### Dialisi
-
-**Dialisi.** Integrata da esenzione per dialisi, prestazioni ambulatoriali di dialisi e
-ricoveri. È anche una delle **fonti dell'IRC** (fornisce `data_dialisi`). Output:
-`integrata_dialisi`, `data_integrata_dialisi`.
+`data_integrata_fa = min(ecg, cardionet, pronto soccorso, sdo)`; `fa_from` = `ecg` / `vis`
+/ `ps` / `sdo`; affetto se `0 < data_integrata_fa < data_indice`. Output: `integrata_fa`,
+`data_integrata_fa`.
 
 ```mermaid
 flowchart LR
-  esen[(esenzione)]:::l0 --> MIN{{merge coorte<br/>min-date + &lt;x&gt;_from}}:::tf
-  lab[marcatore laboratorio]:::l1 --> MIN
-  far[terapia della classe]:::l1 --> MIN
-  dg[(diagnosi aggregata)]:::l2 --> MIN
-  MIN --> OUT[integrata_&lt;x&gt;]:::out
+  ecg[(referto ECG<br/>FA)]:::l1 --> MIN{{merge coorte<br/>min-date + fa_from}}:::tf
+  car[(cardionet FA=1)]:::l1 --> MIN
+  ps[(pronto soccorso<br/>FA)]:::l0 --> MIN
+  sdo[(SDO ICD9_CV_FA)]:::l1 --> MIN
+  MIN --> OUT[integrata_fa]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
+#### <ins>Ipertensione</ins>
+
+**Ipertensione arteriosa.** La più articolata: combina **esenzione**, **diagnosi**,
+**terapia** (con regole di conteggio) e **SDO**.
+- **Esenzione** — codici `0031` / `031A`.
+- **Diagnosi aggregata** — `DIAG_FR_HYPERTENS = 1` oppure `diag_CV_HYPERTENSIVE_HD = 1`.
+- **Terapia antipertensiva** — soddisfatta quando c'è un uso **ripetuto** di una classe:
+  ≥ 2 prescrizioni di diuretici (esclusi furosemide, metolazone, torasemide…),
+  ACE/sartani, betabloccanti (o diltiazem/verapamil) o calcio‑antagonisti; oppure ≥ 3
+  prescrizioni di antipertensivi generici. Alcune classi contano solo se combinate con un
+  ricovero (scompenso o cardiopatia ischemica/aritmie). `data_farma` = prima data utile tra
+  queste.
+- **SDO** — ricoveri per aritmie, cardiopatia ischemica cronica, FA o scompenso.
+- Sono **esclusi** i casi di ipertensione secondaria (`ICD9_ANTYHYPER`).
+
+`data_integrata_ipertensione = min(esenzione, diagnosi, terapia)`. Output:
+`integrata_ipertensione`, `data_integrata_ipertensione`.
+
+```mermaid
+flowchart LR
+  ese[(esenzione 0031/031A)]:::l0 --> MIN{{merge coorte<br/>min-date}}:::tf
+  dia[(diag FR_HYPERTENS<br/>o HYPERTENSIVE_HD)]:::l2 --> MIN
+  far[terapia: conteggi per classe<br/>diuretici/ACE/beta/Ca >=2<br/>antipert. >=3]:::l1 --> MIN
+  sdo[(SDO aritmie/ischem/FA/SCC)]:::l1 --> far
+  MIN --> OUT[integrata_ipertensione]:::out
   classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
   classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
   classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
@@ -651,16 +683,177 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-> Lo schema sopra vale per ipertensione, dislipidemia, anemia, ipercolesterolemia
-> familiare, obesità e dialisi: cambiano le fonti concrete (marcatore, classe farmaci,
-> codici diagnosi), non lo schema.
+#### <ins>Dislipidemia</ins>
+
+**Dislipidemia.** Integrata da diagnosi, LDL e terapia:
+- **Diagnosi aggregata** — `diag_FR_DYSLIP = 1`;
+- **LDL** — dal profilo lipidico unificato (`ESAMI_LDL_UNIFICATO`) con **LDL > 115 mg/dL**
+  (si prende il valore massimo);
+- **Statine/ipolipemizzanti** — prima prescrizione (`DSFARMA_IPOLIPEMIZZANTI`) in una
+  finestra fino a **10 anni** prima della data di riferimento;
+- **Esenzione** — codice `025` (estratta ma non usata nel calcolo della data).
+
+`data_integrata_dislipidemia = min(statine, LDL, diagnosi)`; affetto se la data è valida e
+precedente al riferimento temporale. Output: `integrata_dislipidemia`,
+`data_integrata_dislipidemia`.
+
+```mermaid
+flowchart LR
+  dia[(diag FR_DYSLIP)]:::l2 --> MIN{{merge coorte<br/>min-date}}:::tf
+  ldl[(ESAMI_LDL_UNIFICATO<br/>LDL &gt; 115)]:::l1 --> MIN
+  far[(DSFARMA_IPOLIPEMIZZANTI<br/>prima in 10 anni)]:::l1 --> MIN
+  MIN --> OUT[integrata_dislipidemia]:::out
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
+#### <ins>Anemia</ins>
+
+**Anemia.** Integrata da laboratorio e diagnosi:
+- **Emoglobina** — soglia **sesso‑specifica**: `< 12 g/dL` per le donne, `< 13 g/dL` per gli
+  uomini, nella finestra `data_indice − 365 … data_indice + 30`; si tiene la prima data;
+- **Diagnosi aggregata** — `diag_CM_ANEMIA = 1` (ICD‑9 280–285), stessa finestra.
+
+`data_integrata_anemia = min(diagnosi, emoglobina)`; `anemia_from` = `diag` / `hb`; affetto
+se `0 < data < data_indice`. Output: `integrata_anemia`, `data_integrata_anemia`.
+
+```mermaid
+flowchart LR
+  hb[(ESAMI_EMOGLOBINA<br/>F&lt;12 · M&lt;13)]:::l1 --> MIN{{merge coorte<br/>min-date + anemia_from}}:::tf
+  dia[(diag_CM_ANEMIA<br/>ICD9 280-285)]:::l2 --> MIN
+  MIN --> OUT[integrata_anemia]:::out
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
+#### <ins>Rischio CVMA</ins>
+
+**Rischio cardiovascolare molto alto (RCVMA).** Non è una diagnosi da fonti L0 ma un
+**flag L4** che marca i soggetti a rischio CV molto alto. Vale `1` se è presente **almeno
+una** di queste condizioni:
+- **ASCVD conclamata** — cardiopatia ischemica cronica, TIA/ictus o arteriopatia periferica;
+- **diabete con danno d'organo** — diabete integrato più IRC, cardiopatia ischemica,
+  neuro/retinopatia diabetica, arteriopatia o GFR < 60;
+- **diabete ad alto carico di rischio** — diabete più ≥ 3 fattori di rischio (ipertensione,
+  dislipidemia, fumo, obesità, familiarità) oppure diabete da ≥ 10 anni;
+- **IRC severa** — GFR < 30.
+
+`data_integrata_rcvma = min(data diabete, data ICD‑9, data prelievo, oggi)`. Output:
+`integrata_rcvma`, `data_integrata_rcvma`.
+
+```mermaid
+flowchart LR
+  ascvd[(ASCVD conclamata<br/>ischemia/ictus/PAD)]:::l2 --> R{{RCVMA = 1<br/>se una condizione}}:::tf
+  dm[diabete integrato<br/>+ danno organo / >=3 FR / >=10 anni]:::l3 --> R
+  gfr[GFR &lt; 30]:::l1 --> R
+  R --> OUT[integrata_rcvma]:::l4
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef l3 fill:#f8d0d5,stroke:#c04a57,color:#111;
+  classDef l4 fill:#e2d6f3,stroke:#8a63c0,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+```
+
+#### <ins>Ipercolesterolemia familiare</ins>
+
+**Ipercolesterolemia familiare.** Non un semplice min‑date, ma una **classificazione a
+criteri** (stile Dutch/MEDPED) che combina tre elementi:
+- **LDL corretto per la terapia** — l'LDL misurato pre‑indice viene "scorporato" dall'effetto
+  della terapia ipolipemizzante in corso: `LDL_teorico = LDL_misurato / (1 − potenza)`, dove
+  la potenza dipende dai farmaci nella finestra `LDL − 90 giorni … LDL`;
+- **Familiarità cardiovascolare** — flag `FR_FAM_CV` e ASCVD precoce dei **genitori**
+  (ricostruiti via `key_anagrafe` di madre e padre: PTCA, bypass, arteriopatia, TIA/ictus da
+  diagnosi aggregate e SDO);
+- **ASCVD precoce del paziente** — PTCA, bypass, arteriopatia, TIA/ictus o infarto con
+  **età giovane** (donne ≤ 60, uomini ≤ 55 anni).
+
+Output: `integrata_ipercolfam`, `data_integrata_ipercolfam`.
+
+```mermaid
+flowchart LR
+  ldl[(LDL pre-indice)]:::l1 --> COR{{LDL teorico<br/>LDL / 1-potenza}}:::tf
+  far[(ipolipemizzanti<br/>potenza)]:::l1 --> COR
+  gen[(ASCVD genitori<br/>+ FR_FAM_CV)]:::l2 --> CRIT{{criteri ipercol familiare}}:::tf
+  early[(ASCVD precoce paziente<br/>F&lt;=60 · M&lt;=55)]:::l2 --> CRIT
+  COR --> CRIT --> OUT[integrata_ipercolfam]:::out
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
+#### <ins>Microalbuminuria</ins>
+
+**Microalbuminuria.** Integrata da laboratorio urinario e SDO:
+- **Laboratorio** — i marcatori di proteinuria (MALBU, ACR, PCR, AER, PER, PROTU) sono
+  valutati con soglia **dipendente dall'unità di misura**: ≥ 3 mg/24h, ≥ 2 mg/dL,
+  ≥ 20 mg/L, ≥ 30 mg/g → positività (`lab_microalb`); si tiene il massimo per persona/indice;
+- **SDO** — `diag_CM_ALBUMINURIA = 1`.
+
+Output: `integrata_microalbuminuria`, `data_integrata_microalbuminuria`.
+
+```mermaid
+flowchart LR
+  lab[(proteinuria: malbu/acr/pcr<br/>aer/per/protu)]:::l1 --> TH{{soglia per unita<br/>3/24h · 2 dL · 20 L · 30 g}}:::tf
+  sdo[(SDO diag_CM_ALBUMINURIA)]:::l2 --> MIN{{merge coorte}}:::tf
+  TH --> MIN --> OUT[integrata_microalbuminuria]:::out
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
+#### <ins>Obesità</ins>
+
+**Obesità.** Integrata da antropometria e diagnosi:
+- **BMI** — calcolato dai parametri funzionali C@rdioNet (peso e altezza):
+  `BMI = ceil(peso / (altezza/100)²)`, si tiene chi ha **BMI ≥ 30**;
+- **Diagnosi aggregata** — `diag_FR_OBESITA = 1`.
+
+`data_integrata_obesita = min(data BMI, data diagnosi)`; affetto se la data è valida. Output:
+`integrata_obesita`, `data_integrata_obesita`.
+
+```mermaid
+flowchart LR
+  pf[(parametri funzionali<br/>peso + altezza)]:::l1 --> BMI{{BMI = peso/altezza²<br/>tieni BMI &gt;= 30}}:::tf
+  dia[(diag_FR_OBESITA)]:::l2 --> MIN{{merge coorte<br/>min-date}}:::tf
+  BMI --> MIN --> OUT[integrata_obesita]:::out
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
+#### <ins>Dialisi</ins>
+
+**Dialisi.** Integrata da esenzione per dialisi, prestazioni ambulatoriali di dialisi e
+ricoveri; la data è la minima tra le fonti. È anche una delle **fonti dell'IRC** (fornisce
+`data_dialisi`). Output: `integrata_dialisi`, `data_integrata_dialisi`.
+
+```mermaid
+flowchart LR
+  ese[(esenzione dialisi)]:::l0 --> MIN{{merge coorte<br/>min-date}}:::tf
+  amb[(ambulatoriale dialisi)]:::l0 --> MIN
+  sdo[(SDO dialisi)]:::l1 --> MIN
+  MIN --> OUT[integrata_dialisi]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
+---
 
 ### Esami
 
 Gli esami comprendono il **laboratorio** e gli **esami strumentali** cardiologici e
 respiratori, tutti agganciati alla coorte.
 
-#### Laboratorio
+#### <ins>Laboratorio</ins>
 
 **Definizione.** Aggancia alla coorte gli esami costruiti dal [builder
 B0](#esami-di-laboratorio--builder-b0) e ne deriva gli indicatori clinici (GFR, classi
@@ -698,7 +891,7 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### ECO ed ECG
+#### <ins>ECO ed ECG</ins>
 
 **Definizione.** Esami strumentali cardiologici da C@rdioNet: **ecocardiografia** (ECO, da
 `DWTSISSR.VFP_CARDIO_ECO`) ed **elettrocardiografia** (ECG, da
@@ -724,7 +917,7 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### Spirometrie
+#### <ins>Spirometrie</ins>
 
 **Definizione.** Esami di funzionalità respiratoria dal flusso ambulatoriale.
 
@@ -746,7 +939,7 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### Fenotipo
+#### <ins>Fenotipo</ins>
 
 **Definizione.** Classificazione del **fenotipo di scompenso** in base alla frazione di
 eiezione ventricolare sinistra (LVEF), da ecocardiografia C@rdioNet (`VFP_CARDIO_ECO`) e
@@ -773,7 +966,7 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### Parametri funzionali
+#### <ins>Parametri funzionali</ins>
 
 **Definizione.** Parametri clinico‑funzionali da C@rdioNet (`VFP_CARDIO_PARAMFUNZ`):
 pressione, frequenza, antropometria, classe NYHA, saturazione, INR, ecc.
@@ -795,6 +988,8 @@ flowchart LR
   classDef tf fill:#ececec,stroke:#777,color:#111;
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
+
+---
 
 ### Eventi
 
@@ -830,7 +1025,7 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### MALE
+#### <ins>MALE</ins>
 
 **Major Adverse Limb Event** — eventi maggiori agli arti inferiori più il decesso.
 Componenti: amputazione arti inferiori (`EVENTO_AMPUTAZ`), rivascolarizzazione arti
@@ -839,7 +1034,7 @@ inferiori (`EVENTO_RIVASC`), evento ischemico/trombotico (`EVENTO_ISCHTROM`).
 `data_male = min(decesso, amputazione, ischemico, rivascolarizzazione)`;
 `male = 1` se almeno una componente o il decesso. Output: `male`, `data_male`, `distmale`.
 
-#### MACE 3p e 5p
+#### <ins>MACE 3p e 5p</ins>
 
 **Major Adverse Cardiovascular Event**, in due definizioni.
 
@@ -859,16 +1054,18 @@ Output: `mace3`, `mace5`, `data_mace3`, `data_mace5`, `dist3pi`, `dist5pi`.
 | **MACE 3p** | infarto (IMA), ictus (stroke) |
 | **MACE 5p** | infarto, ictus, scompenso (PNE), bypass (BAC), angioplastica (PTCA) |
 
-#### Eventi di ricovero
+#### <ins>Eventi di ricovero</ins>
 
 Eventi di ospedalizzazione classificati per tipo (CV/non‑CV, per apparato), dalle SDO. Tra
 le variabili trattenute: ricoveri CV e non‑CV, IRC, malattia renale, dialisi, interventi,
 scompenso, valvole, ASCVD multisito.
 
-#### Emorragie maggiori
+#### <ins>Emorragie maggiori</ins>
 
 Eventi emorragici rilevanti, distinti per tipo (macro `accoda_emod`). Output: `emomag_a`,
 `emomag_f`, `data_emomag_a`, `data_emomag_f`.
+
+---
 
 ### Prestazioni
 
@@ -905,6 +1102,8 @@ flowchart LR
 > ⚠︎ **Limite.** Nessuna prestazione ha un foglio nel datamart‑builder: la lista variabili
 > di output va letta dalle colonne del dataset prodotto.
 
+---
+
 ### Score
 
 Gli score sintetizzano il profilo di rischio o comorbidità in un unico indicatore. Cinque
@@ -912,44 +1111,61 @@ unità hanno `type=score`: **SCORE2**, **SCOREC**, **Charlson**, **ESC** e **cla
 rischio CV** (che aggrega diagnosi integrate e score). SCORE2 e SCOREC dipendono dal diabete
 integrato.
 
-#### SCORE2 e SCORE2-OP
+#### <ins>SCORE2 e SCORE2-OP</ins>
 
-Rischio cardiovascolare a 10 anni (SCORE2 per gli adulti, SCORE2‑OP *Older Persons* per gli
-anziani), da età, sesso, pressione sistolica, colesterolo totale, HDL, fumo e diabete.
-Output: `SCORE2`, `risk_class_score2`, `flag_missing_score2`.
+Rischio cardiovascolare a 10 anni da età, sesso, pressione sistolica, colesterolo totale,
+HDL, fumo e diabete. Distingue `young` (età ≤ 69, **SCORE2**) da `old` (> 69,
+**SCORE2‑OP** *Older Persons*), con centrature e coefficienti diversi. Il rischio è calcolato
+**direttamente** dalla baseline‑survival: `score2 = (1 − s0^exp(predittore)) × 100`, senza
+un passo di ricalibrazione esplicito. Output: `SCORE2`, `risk_class_score2`,
+`flag_missing_score2`.
 
-#### SCOREC
+#### <ins>SCOREC</ins>
 
-Variante **ricalibrata** di SCORE2. Usa gli stessi predittori (età, sesso, pressione
-sistolica, colesterolo totale, HDL, fumo, diabete) con un modello di sopravvivenza a
-coefficienti specifici per sesso, seguito da una trasformazione di calibrazione; il
-risultato è in percentuale. Se manca uno tra età, pressione, colesterolo o HDL, `SCOREC`
-non è calcolato. Output: `SCOREC`, `risk_class_scorec`, `flag_missing_scorec`. Nel grafo:
-EGP `SCOREC`, flusso `SCORECAL`, output L4 `CLINICO.COORTE_SCOREC`.
+Calcola il rischio a 10 anni con **la stessa forma di SCORE2** (stessi predittori — età,
+sesso, pressione sistolica, colesterolo totale, HDL, fumo, diabete — stessa centratura,
+coefficienti specifici per sesso e forma `1 − s0^exp(predittore)`), **ma applica in più un
+passo di ricalibrazione** che l'EGP SCORE2 non ha:
+
+```
+uncalibrated = 1 − s0^exp(predittore)
+SCOREC = 1 − exp( − exp( scale1 + scale2 · log( −log(1 − uncalibrated) ) ) )
+```
+
+Quella trasformazione `scale1/scale2` sul complementary log‑log è il passo di
+**ricalibrazione regionale** del metodo SCORE2 (da cui, verosimilmente, la `C` di
+*calibrato*). Il risultato è in percentuale; se manca uno tra età, pressione, colesterolo o
+HDL, `SCOREC` non è calcolato. Output: `SCOREC`, `risk_class_scorec`, `flag_missing_scorec`.
+Nel grafo: EGP `SCOREC`, flusso `SCORECAL`, output L4 `CLINICO.COORTE_SCOREC`.
+
+> ⚠︎ **Nota.** Il sorgente non documenta la provenienza dei coefficienti `b*` né dei valori
+> `scale1/scale2`, quindi *quale* ricalibrazione (per quale regione di rischio) è
+> un'inferenza dalla forma del codice, non un'etichetta scritta nel programma.
 
 ```mermaid
 flowchart LR
-  par[eta/sesso/pas]:::l1 --> SC{{SCORE2 ricalibrato<br/>coeff. per sesso<br/>scale1/scale2}}:::tf
+  par[eta/sesso/pas]:::l1 --> SC{{rischio SCORE2<br/>1 - s0^exp predittore}}:::tf
   lab[col/hdl]:::l1 --> SC
   dm[diabete integrato]:::l3 --> SC
-  SC --> OUT[SCOREC<br/>risk_class_scorec<br/>flag_missing_scorec]:::l4
+  SC --> RC{{ricalibrazione<br/>scale1 + scale2 · cloglog}}:::tf
+  RC --> OUT[SCOREC<br/>risk_class_scorec<br/>flag_missing_scorec]:::l4
   classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
   classDef l3 fill:#f8d0d5,stroke:#c04a57,color:#111;
   classDef l4 fill:#e2d6f3,stroke:#8a63c0,color:#111;
   classDef tf fill:#ececec,stroke:#777,color:#111;
 ```
 
-#### Charlson
+#### <ins>Charlson</ins>
 
 **Charlson Comorbidity Index** — indice di comorbidità costruito dai ricoveri e dalle
 diagnosi aggregate, come somma pesata delle condizioni croniche. Output: `charlson_score`.
 
-#### ESC
+#### <ins>ESC</ins>
 
 **ESC score** — punteggio di rischio secondo le linee guida della Società Europea di
 Cardiologia. Output: `escscore`.
 
-#### Classi di rischio cardiovascolare
+#### <ins>Classi di rischio cardiovascolare</ins>
 
 Classificazione finale del rischio CV (CLRCV, L4), che combina diagnosi integrate,
 laboratorio e parametri. Prodotta nel flusso CLASSI_RISCHIO. Output: `classi_rischio`
@@ -967,12 +1183,14 @@ flowchart LR
   classDef tf fill:#ececec,stroke:#777,color:#111;
 ```
 
+---
+
 ### Terapia
 
 La terapia descrive i farmaci del soggetto da due fonti: la **farmaceutica territoriale** e
 la **terapia registrata in C@rdioNet**.
 
-#### Terapia farmaceutica
+#### <ins>Terapia farmaceutica</ins>
 
 Terapia farmaceutica territoriale agganciata alla coorte, costruita sopra le macro‑classi
 `dsfarma_*` del [builder FARMATERR](#farmaceutica-territoriale--builder-farmaterr), con
@@ -998,7 +1216,7 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
-#### Terapia C@rdioNet
+#### <ins>Terapia C@rdioNet</ins>
 
 La terapia farmacologica registrata nella cartella cardiologica, aggregata in classi
 (ACE‑inibitori/sartani, betabloccanti, antiaggreganti, anticoagulanti, antidiabetici,
@@ -1006,6 +1224,8 @@ calcio‑antagonisti, diuretici, ipolipemizzanti). Per ogni classe: presenza, co
 numero di confezioni, quantità e sostanza (`<classe>`, `_ATCCOD`, `_CONF`, `_QTA`, `_SOST`).
 Fonti: `vfp_cardio_terapia`, `vdizionario_farmaci_atc`, `vdizionario_farmaci_sost`. Output:
 `terapiacardionet` (40 variabili trattenute su 190).
+
+---
 
 ### Le due viste del datamart
 
