@@ -1,700 +1,912 @@
-# 🙋 README
+# OCVTS — Documentazione del Repository
 
-Il Documento e’ diviso in tre parti principali. 
+> Documentazione del sistema OCVTS (Osservatorio Cardiovascolare del Friuli Venezia
+> Giulia). Il documento è organizzato in tre parti, con vista **top‑down** (dal generale
+> al particolare):
+> **Introduzione** (cos'è il repository, le fonti, i livelli dati, i protocolli) ·
+> **Builders** (come dai dati grezzi L0 si costruiscono le aggregazioni L1–L2) ·
+> **Datamart** (come le variabili L0–L4 diventano le colonne che vedete nella coorte).
+>
+> I flussi sono ricostruiti **staticamente** dalla pipeline di lineage (senza accesso al
+> server SAS). Dove la ricetta non è catturabile staticamente è indicato con una nota
+> **⚠︎ Limite**. Ogni capitolo dei builder e del datamart apre con un **diagramma di
+> flusso** semplificato (nomi leggibili, filtri sintetizzati, colori per livello).
 
-1\) **INTRODUZIONE**.
+## Sommario
 
-2\) **BUILDERS**
+- [Introduzione](#introduzione)
+  - [Il RER](#il-rer)
+  - [I dati e i livelli L0–L4](#i-dati-e-i-livelli-l0l4)
+  - [I protocolli](#i-protocolli)
+  - [Le variabili standard](#le-variabili-standard)
+  - [Obiettivi dell'OCVTS](#obiettivi-dellocvts)
+  - [Profondità temporale delle tabelle](#profondità-temporale-delle-tabelle)
+  - [Come leggere i diagrammi](#come-leggere-i-diagrammi)
+  - [La regola della diagnosi integrata](#la-regola-della-diagnosi-integrata)
+- [Builders](#builders)
+  - [SDO — builder A01](#sdo--builder-a01)
+  - [Diagnosi C@rdioNet — builder A02](#diagnosi-crdionet--builder-a02)
+  - [Diagnosi aggregate — builder A03](#diagnosi-aggregate--builder-a03)
+  - [Esami di laboratorio — builder B0](#esami-di-laboratorio--builder-b0)
+  - [Farmaceutica territoriale — builder FARMATERR](#farmaceutica-territoriale--builder-farmaterr)
+  - [Dizionari costruiti](#dizionari-costruiti)
+  - [Builder delle diagnosi integrate — D01](#builder-delle-diagnosi-integrate--d01)
+- [Datamart](#datamart)
+  - [Diagnosi](#diagnosi)
+    - [IRC](#irc)
+    - [Diabete](#diabete)
+    - [Scompenso](#scompenso)
+    - [BPCO](#bpco)
+    - [COVID](#covid)
+    - [Fibrillazione atriale](#fibrillazione-atriale)
+    - [Ipertensione](#ipertensione)
+    - [Dislipidemia](#dislipidemia)
+    - [Anemia](#anemia)
+    - [Rischio CVMA](#rischio-cvma)
+    - [Ipercolesterolemia familiare](#ipercolesterolemia-familiare)
+    - [Microalbuminuria](#microalbuminuria)
+    - [Obesità](#obesità)
+    - [Dialisi](#dialisi)
+  - [Esami](#esami)
+    - [Laboratorio](#laboratorio)
+    - [ECO ed ECG](#eco-ed-ecg)
+    - [Spirometrie](#spirometrie)
+    - [Fenotipo](#fenotipo)
+    - [Parametri funzionali](#parametri-funzionali)
+  - [Eventi](#eventi)
+    - [MALE](#male)
+    - [MACE 3p e 5p](#mace-3p-e-5p)
+    - [Eventi di ricovero](#eventi-di-ricovero)
+    - [Emorragie maggiori](#emorragie-maggiori)
+  - [Prestazioni](#prestazioni)
+  - [Score](#score)
+    - [SCORE2 e SCORE2-OP](#score2-e-score2-op)
+    - [SCOREC](#scorec)
+    - [Charlson](#charlson)
+    - [ESC](#esc)
+    - [Classi di rischio cardiovascolare](#classi-di-rischio-cardiovascolare)
+  - [Terapia](#terapia)
+    - [Terapia farmaceutica](#terapia-farmaceutica)
+    - [Terapia C@rdioNet](#terapia-crdionet)
+  - [Le due viste del datamart](#le-due-viste-del-datamart)
+- [Note di copertura](#note-di-copertura)
 
-3\) **DATAMART**
+---
 
-**Nella sezione INTRODUZIONE**  
-Trovate la descrizione di cosa sia il Repository e in generale introduce i concetti base per capire i due passaggi successivi: i builders e i datamarts.
+## Introduzione
 
-**Nella sezione BUILDERS**  
-Ci sono le descrizioni di come dai dati raw L0 vengono costruite le tabelle di livello 1\. E di come da L1 si costruiscono le L2. Invece, L3 e L4 sono sempre coorte specifiche quindi non c’e’ un flusso generale di costruzione.
+### Il RER
 
-**Nella sezione DATAMART**  
-Ci sono le descrizioni di come le variabili di livello 0 1 2 3 vengano usate per generare le variabili che voi effettivamente vedete nel datamart.
+Il Repository Epidemiologico Regionale (RER) è un data warehouse gestito da Insiel S.p.A.
+su mandato dell'ARCSS. Al suo interno non sono presenti dati che consentano
+l'identificazione diretta degli individui: ogni sei mesi viene generata una nuova
+`key_anagrafe`, una chiave pseudonimizzata che identifica univocamente ciascun soggetto.
 
-# Intro OCVTS
+Nel RER confluiscono numerose fonti dati, prevalentemente amministrative ma anche alcune
+cliniche verticali, attraverso un articolato processo ETL e successivi controlli di
+consistenza. Un elemento distintivo del sistema del Friuli Venezia Giulia (FVG) è la
+presenza nel RER dei risultati degli esami di laboratorio eseguiti presso i laboratori
+pubblici della Regione (DNLAB).
 
-# Il Rer
+La profondità temporale dei dati varia a seconda del flusso informativo: le SDO risalgono
+fino al 1985, mentre le anagrafiche contengono dati anche anteriori. Altri flussi hanno
+profondità inferiori: i dati di laboratorio sono disponibili dal 2009, la farmaceutica
+convenzionata dal 1995, il CUP dal 2013 e il PS dal 2000.
 
-Il Repository Epidemiologico Regionale (RER) è un data warehouse gestito da Insiel S.p.A. su mandato dell’ARCSS. Al suo interno non sono presenti dati che consentano l’identificazione diretta degli individui: ogni sei mesi viene generata una nuova “key\_anagrafe”, una chiave pseudonimizzata che identifica univocamente ciascun soggetto.
+Oltre ai flussi amministrativi, il RER include fonti cliniche come **C@rdioNet**, un
+software gestionale verticale che rappresenta la cartella clinica cardiologica, compilata
+dai cardiologi e dal personale infermieristico a ogni contatto con il paziente a partire
+dal 2010. Nel RER la cartella C@rdioNet è suddivisa in **13 tabelle**, prive di chiavi
+esterne di collegamento: tutte sono unite esclusivamente mediante la `key_anagrafe`.
+Questo implica che, per caratterizzare un individuo in un determinato momento, è
+necessario definire regole temporali per correlare le informazioni provenienti dalle
+diverse tabelle.
 
-Nel RER confluiscono numerose [fonti dati](#bookmark=kix.bj34j5v9d95j), prevalentemente amministrative, ma anche alcune cliniche verticali, attraverso un articolato processo ETL e successivi controlli di consistenza. Un elemento distintivo del sistema del Friuli Venezia Giulia (FVG) è la presenza nel RER dei risultati degli esami di laboratorio eseguiti presso i laboratori pubblici della Regione (DNLAB).
+### I dati e i livelli L0–L4
 
-La profondità temporale dei dati varia a seconda del flusso informativo: le SDO risalgono fino al 1985, mentre le anagrafiche contengono dati anche anteriori, relativi a chiunque abbia avuto contatti con il sistema sanitario regionale, indipendentemente dalla residenza. Altri flussi hanno profondità inferiori: i dati di laboratorio sono disponibili dal 2009, quelli relativi alla farmaceutica convenzionata dal 1995, il CUP dal 2013 e il PS dal 2000\.
+I dataset impiegati per le analisi sono il risultato di un processo di costruzione di
+variabili a partire dai dati grezzi del RER, organizzati in livelli progressivi di
+raffinatezza.
 
-Oltre ai flussi amministrativi, il RER include anche fonti cliniche, come C@rdioNet, un software gestionale verticale che rappresenta la cartella clinica cardiologica, compilata regolarmente da medici cardiologi e personale infermieristico a ogni contatto diretto con il paziente, a partire dal 2010\. Fino al 2015, C@rdioNet era accessibile solo tramite un portale regionale basato su Business Object; successivamente è stata integrata completamente nel RER, consentendo così l’accesso ai dati clinici in sinergia con gli altri flussi amministrativi.
+**L0 — dati originari del RER.** Tabelle direttamente accessibili nel RER, derivate dai
+flussi amministrativi e clinici dopo l'ETL di Insiel. Elenco non esaustivo:
 
-Nel RER, la cartella C@rdioNet è suddivisa in 13 tabelle, prive di chiavi esterne di collegamento: tutte sono unite esclusivamente mediante la key\_anagrafe. Questo implica che, per caratterizzare un individuo in un determinato momento (es. situazione anamnestica o follow-up), è necessario definire regole temporali per correlare le informazioni provenienti dalle diverse tabelle.
+* Anagrafica (anagrafe generale, nascite, decessi, genitori, residenze, domicili)
+* Ricoveri ospedalieri (schede di dimissione ospedaliera, SDO)
+* ADI (assistenza domiciliare integrata), PIC, RSA
+* Esenzioni
+* Farmaceutica territoriale; farmaceutica ospedaliera e diretta[^1]
+* PS (pronto soccorso), anatomia patologica (SNOMED)
+* CUP (prenotazioni), prestazioni ambulatoriali
+* DNLAB (esami di laboratorio — solo laboratori pubblici FVG)
+* C@rdioNet (13 tabelle cliniche unite tramite `key_anagrafe`)
 
-# I dati
+**L1 — prima aggregazione.**
+- **DNLAB:** aggregazione dei codici che identificano lo stesso esame (es. emoglobina
+  glicata: HBGL%, HBGL, HBA1C, A1C, …).
+- **FARMA:** codifica in classi farmacologiche degli ATC.
+- **SDODIA:** classificazione dei ricoveri secondo i codici ICD‑9.
+- **CARDIA:** classificazione delle diagnosi C@rdioNet per descrizione, sede e gravità.
 
-L’OCVTS utilizza i dati archiviati nel RER, sia di natura amministrativa sia clinica, come descritto sopra.
+**L2 — aggregazione intermedia.**
+- **DIAGG:** aggregazione di diagnosi tra SDODIA e CARDIA.
+- **LABUNI:** unificazione dei dati di laboratorio tra DNLAB e referti C@rdioNet.
+- **EVENTI:** identificazione di eventi complessi (es. MACE 3p/5p, MALE) combinando L1 e L0.
 
-I dataset effettivamente impiegati per analisi cliniche, epidemiologiche o di governance sono il risultato di un complesso processo di costruzione di variabili a partire dai dati grezzi presenti nel RER. Tali dati vengono organizzati in livelli progressivi di raffinatezza:
+**L3 — diagnosi integrate (DIAINT).** Diagnosi integrate da fonti L0/L1/L2 (es. diabete
+integrato definito dalla data minima tra esenzione, emoglobina glicata elevata,
+prescrizioni farmacologiche e diagnosi aggregata).
 
-**L0 – dati originari contenuti nel RER.**
+**L4 — classificazione avanzata (CLRCV).** Classi di rischio cardiovascolare e score.
 
-A questo livello le tabelle sono quelle direttamente accessibili nel RER e derivate dai flussi informativi amministrativi e clinici, dopo un processo ETL in carico a Insiel S.p.A.. L’elenco non esaustivo delle tabelle che rientrano in questo livello include:
+Alcune variabili sono precostituite e disponibili indipendentemente dalla coorte; altre,
+come le diagnosi integrate, sono costruite **solo per la coorte** in esame — un
+compromesso tra spazio nel RER e tempi di calcolo (es. l'etichettatura dei ricoveri
+richiede ~6 ore in versione non parallelizzata).
 
-* Anagrafica (anagrafe generale, nascite, decessi, identificazione genitori, residenze, domicili)  
-* Ricoveri ospedalieri (schede di dimissione ospedaliera)  
-* ADI (assistenza domiciliare integrata)  
-* PIC (prestazioni intermedie domiciliari)  
-* RSA (residenze sanitarie assistenziali)  
-* Esenzioni  
-* Farmaceutica territoriale (sistema pubblico di distribuzione del farmaco)  
-* Farmaceutica ospedaliera e diretta[^1]  
-* PS (prestazioni di pronto soccorso)  
-* anatomia patologica (referti codificati SNOMED)  
-* CUP (prenotazioni del centro unico)  
-* Prestazioni ambulatoriali  
-* DNLAB (esami di laboratorio – solo laboratori pubblici FVG)  
-* C@rdioNet (13 tabelle cliniche non collegate tra loro da chiavi esterne, ma tutte unite tramite key\_anagrafe)
+### I protocolli
 
-Queste rappresentano la base dati originaria da cui si costruiscono, attraverso vari passaggi di elaborazione, le variabili di livello L1, L2, L3 e L4.
+Esistono tre prototipi di studio, chiamati protocolli:
 
-**L1 – Livello di prima aggregazione**:
+* **CLINICO** — studi clinici con una coorte ben definita (unità statistica = persona,
+  evento o esame). La definizione della coorte è fase fondamentale e non standardizzabile:
+  richiede la collaborazione tra programmatore SAS e referente clinico per tradurre i
+  criteri di inclusione/esclusione nel linguaggio del RER.
+* **PDTA** — attinente ai 3 PDTA SCC, BPCO, DIABETE (unità statistica = persone affette,
+  ripetute su tutti gli anni di indagine).
+* **EPI4M** — una via di mezzo tra clinico e PDTA sulle tre patologie.
 
-DNLAB: aggregazione di codici che identificano lo stesso esame di laboratorio (es. emoglobina glicata: HBGL%, HBGL, HBA1C, A1C, ecc.).
+Definita la coorte, si aggiungono le variabili di follow‑up per la valutazione degli
+outcome. Le variabili L1–L4 possono essere aggiunte in modo semi‑automatico: il ricercatore
+seleziona, tramite un foglio Excel strutturato, quali variabili includere, come
+rinominarle e in che ordine disporle nel datamart finale.
 
-FARMA: codifica in classi farmacologiche degli ATC (es. "alfa bloccanti": C02CA04, G04CA01, ecc.).
+### Le variabili standard
 
-SDODIA: classificazione dei ricoveri secondo i codici ICD9 (es. specifici codici per lo scompenso cardiaco cronico secondo la definizione PNE).
+Classi di variabili già pronte. Per i protocolli PDTA ed EPI4M la selezione è fissa; per
+il protocollo CLINICO il referente sceglie cosa trattenere.
 
-CARDIA: classificazione delle diagnosi presenti in C@rdioNet basata su descrizione, sede e gravità (es. “OBESITÀ” con vari gradi: lieve, moderato, severo, ecc.).
+* **diagnosi** — diagnosi aggregate; integrate: anemia, BPCO, ipercolesterolemia
+  familiare, COVID, diabete, dislipidemia, FA, ipertensione, IRC, microalbuminuria,
+  obesità, RCVMA, scompenso, dialisi
+* **esami strumentali** — ECG, ECO, spirometrie, parametri funzionali, fenotipo, laboratorio
+* **eventi** — MALE, MACE 3P/5P, eventi di ospedalizzazione, emorragie maggiori
+* **prestazioni** — CUP (altro, ECG, ECO, ecovasco, ecocardio, tutte, spiro, visite),
+  prestazioni C@rdioNet, pronto soccorso
+* **score** — Charlson, ESC, SCORE2, SCOREC, classi di rischio cardiovascolare
+* **terapia** — farmaceutica, terapia C@rdioNet
 
-**L2 – Livello di aggregazione intermedia:**
+### Obiettivi dell'OCVTS
 
-DIAGG: aggregazione di diagnosi tra SDODIA e CARDIA.
+- Definizione di **coorti epidemiologiche** nella popolazione del FVG per analizzare
+  caratteristiche, prognosi, aderenza terapeutica, effetti dei trattamenti, fattori
+  prognostici/predittivi.
+- Valutazione dei **percorsi assistenziali** di specifiche categorie di pazienti, per
+  verificare il rispetto degli standard di cura (farmaci, dispositivi, prestazioni, setting).
+- **Integrazione sistematica** di fonti eterogenee, incluse quelle non strutturate (segnali
+  ECG, immagini ecocardiografiche), per arricchire i fattori prognostici e migliorare la
+  stratificazione del rischio.
 
-LABUNI: unificazione dei dati di laboratorio tra DNLAB e i referti C@rdioNet (es. profilo lipdico).
+### Profondità temporale delle tabelle
 
-EVENTI: identificazione di eventi complessi (es. MACE 3p, 5p, MALE), combinando variabili L1 e L0 (es. data MACE 3p come minima tra decesso, infarto e stroke).
-
-**L3 – Livello di diagnosi integrate:**
-
-DIAINT: diagnosi integrate da fonti L0, L1 e L2 (es. diagnosi integrata di diabete definita dalla data minima tra esenzione 013, valori elevati di emoglobina glicata, prescrizioni farmacologiche e apertura diagnosi in DIAGG).
-
-**L4 – Classificazione avanzata:**
-
-CLRCV: classi di rischio cardiovascolare.
-
-Alcune variabili sono precostituite e disponibili indipendentemente dalla coorte d’indagine; altre, come le diagnosi integrate (DIAINT), sono costruite solo per la coorte specifica in esame. Questa scelta rappresenta un compromesso tra esigenze di spazio nel RER e tempi di calcolo (es. l’etichettatura dei ricoveri richiede circa 6 ore in versione non parallelizzata).
-
-# I protocolli
-
-Esistono 3 diversi prototipi di studi, chiamati protocolli : 
-
-* **CLINICO** –  attinente agli studi clinici con una coorte ben definita \[ l’unita’ statistica e’ o la persona o un evento, un esame\]  
-* **PDTA** – attinente ai 3 pdta SCC, BPCO, DIABETE \[l'unità statistica sono le persone affette da tale patologia ripetute su tutti gli anni di indagine\].   
-* **EPI4M** – una via di mezzo tra un clinico e un pdta su tutte e 3 le patologie
-
-**Coorte PDTA**
-
-**Coorte EPI4M**
-
-**Coorte CLINICO**
-
-La definizione della coorte nel protocollo Clinico e’ fase fondamentale di ogni studio. Essa non può essere standardizzata e richiede una stretta collaborazione tra il programmatore SAS e il referente clinico (medico o infermieristico), al fine di tradurre i criteri clinici di inclusione/esclusione nel linguaggio tecnico del RER.
-
-Una volta definita la coorte, si procede con l’aggiunta delle variabili di follow-up per la valutazione degli outcome, qualora non siano già presenti. Le variabili L1, L2, L3 e L4 possono essere aggiunte alla coorte in modo semi-automatico: il ricercatore seleziona, tramite un foglio Excel strutturato, quali variabili includere, come rinominarle e in quale ordine disporle nel datamart finale.
-
-# Le Variabili \[standard\]
-
-Segue elenco delle classi di variabili gia’ pronte. Le variabili per i protocolli PDTA e EPI4M sono a selezione fissa. Per il protocollo Clinico il referente puo’ scegliere cosa trattenere.
-
-* **diagnosi**  
-  - diagnosi aggregate   
-  - anemia integrata  
-  - BCPO integrata  
-  - ipercol familiare integrata  
-  - COVID integrata  
-  - diabete integrata  
-  - dislipidemia integrata  
-  - FA integrata  
-  - ipertensione integrata  
-  - IRC integrata  
-  - microalbuminuria integrata  
-  - obesità integrata  
-  - RCVMA integrata  
-  - scompenso integrata  
-  - dialisi integrata  
-* **esami strumentali**  
-  - elettrocardiografie ECG  
-  - ecografie ECO  
-  - spirometrie  
-  - parametri funzionali  
-  - fenotipo  
-  - laboratorio  
-* **eventi**  
-  - MALE  
-  - MACE 3P 5P  
-  - eventi ospedalizzazione  
-  - emorragie maggiori  
-* **prestazioni**  
-  - prestazioni CUP \- altro  
-  - prestazioni CUP \- ECG  
-  - prestazioni CUP \- ECO  
-    * prestazioni CUP \- ecovasco  
-    * prestazioni CUP \- ecocardio	  
-  - prestazioni CUP \- tutte  
-  - prestazioni CUP \- spiro  
-  - prestazioni CUP \- visite  
-  - prestazioni Cardionet  
-  - pronto soccorso  
-* **score**  
-  - Charlson score  
-  - ESC score  
-  - SCORE2  
-  - classi di rischio cardiovascolare  
-* **terapia**  
-  - farmaceutica  
-  - terapia Cardionet
-
-# Obiettivi principali dell’OCVTS
-
-Definizione di coorti epidemiologiche nella popolazione del FVG (es. soggetti a rischio o con patologia specifica in un certo periodo e area) per analizzare caratteristiche, prognosi, aderenza terapeutica, effetti di trattamenti, fattori prognostici/predittivi e interazioni tra caratteristiche e trattamenti.
-
-Valutazione dei percorsi assistenziali di specifiche categorie di pazienti (es. soggetti con infarto miocardico acuto in un dato intervallo temporale e area), al fine di verificare il rispetto degli standard di cura in termini di farmaci, dispositivi, prestazioni specialistiche e setting assistenziali.
-
-Integrazione sistematica di fonti eterogenee, incluse quelle non strutturate (es. segnali ECG, immagini ecocardiografiche), per arricchire l’insieme dei possibili fattori prognostici e migliorare la stratificazione del rischio e la diagnosi.
-
-# Tabelle
-
-|  | LIVELLO 0 | LIVELLO 1 | LIVELLO 2 | LIVELLO 3 |
+|  | Livello 0 | Livello 1 | Livello 2 | Livello 3 |
 | :---- | :---- | :---- | :---- | :---- |
 | DNLAB | 2009 | MAX |  |  |
-| PNLAB[^2] | 2010 \- 2016 | MAX |  |  |
+| PNLAB[^2] | 2010–2016 | MAX |  |  |
 | SDO | 1986 | MAX |  |  |
 | FARMA TERR. | 1995 | MAX |  |  |
 | AMBULATORIALE[^3] | 1998 |  |  | 2000 |
 
-I MISSING significano che se c’e’ un flusso a quel livello usa la profondita’ del livello prima.
+I missing significano che, se c'è un flusso a quel livello, usa la profondità del livello
+precedente. Le **esenzioni** non sono aggregate per anno: la data minima di apertura di
+un'esenzione è il 1/1/1900. La tabella **DIAGNOSI** di C@rdioNet è una monotabella (data di
+creazione 1/1/1960, insignificante); come per le esenzioni, la data di prima apertura di
+una diagnosi è il 1/1/1900 (nei documenti si indica convenzionalmente 1/11/2009).
 
-Le ESENZIONI non sono aggregate in tabelle per anno , quindi a me non e’ possible rispondere a questa domanda. La data minima di apertura di una esenzione e’ il 1/1/1900. 
+### Come leggere i diagrammi
 
-CardioNet e’ un gestionale importato nel RER e decomposto in 13 tabelle. Noi usiamo la tabella Diagnosi per costruire le diagnosi aggregate \[LV2\]. La tabella DIAGNOSI e’ una monotabella \[data di creazione 1/1/1960 cioe’ insignificante\] e come per le esenzioni la data di prima apertura di una diagnosi e’ il 1/1/1900. In generale nei documenti dicevamo sempre che la data e’ il 1/11/2009 giorno di entrata in servizio di Andrea come direttore.
+I diagrammi usano una palette unica. Le **tabelle** sono rettangoli/cilindri colorati per
+livello; le **trasformazioni** (DATA step / PROC) sono esagoni grigi `{{…}}` con dentro la
+sintesi dei filtri; le **finestre temporali** sono etichette sugli archi. I nomi
+coorte‑specifici sono scritti senza il prefisso `&nome.` (es. `integrata_irc`).
 
- 
+```mermaid
+flowchart LR
+  a[L0 grezzo RER]:::l0 --> b[L1 aggregazione]:::l1 --> c[L2 intermedio]:::l2
+  c --> d[L3 diagnosi integrate]:::l3 --> e[L4 classi rischio]:::l4
+  t{{trasformazione<br/>filtri/vincoli}}:::tf --> o[output datamart coorte]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef l3 fill:#f8d0d5,stroke:#c04a57,color:#111;
+  classDef l4 fill:#e2d6f3,stroke:#8a63c0,color:#111;
+  classDef tf  fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-# BUILDERS
+| Colore | Livello | Significato |
+|---|---|---|
+| azzurro | **L0** | grezzo RER (`DWTSISSR.v*`), semi del grafo |
+| verde | **L1** | prima aggregazione (esami, classi ATC, SDO, cardionet) |
+| giallo | **L2** | intermedio (diagnosi aggregate, laboratorio unito, eventi) |
+| rosa | **L3** | diagnosi integrate (data minima tra fonti) |
+| viola | **L4** | classi di rischio / score |
+| grigio | trasf. | DATA step / PROC (esagono, con i filtri) |
+| arancio | output | variabile finale nel datamart della coorte |
 
-# FARMACEUTICA
+### La regola della diagnosi integrata
 
-# BUILDER 
+Prima di scendere nelle singole patologie conviene fissare il **pattern comune** che ogni
+diagnosi integrata istanzia. Una diagnosi integrata stabilisce **se** e **da quando** un
+soggetto è affetto da una patologia, incrociando fonti eterogenee che parlano della stessa
+condizione:
 
-Sono stati presi in considerazione 1705 codici ATC. Questi sono stati inseriti in 62 classi, non mutualmente esclusive \[ cioe’ lo stesso atc puo’ appartenere a piu’ classi \]. Poi per motivi di dimensione della tabella finale, le 62 classi sono state divise in 13 tabelle, dette macro classi. 
+- **esenzioni** (il soggetto ha un'esenzione per quella patologia);
+- **esami di laboratorio** (un marcatore fuori range: GFR basso per l'IRC, emoglobina
+  glicata alta per il diabete, …);
+- **prescrizioni farmaceutiche** (terapia cronica coerente con la patologia);
+- **diagnosi aggregate** da ricovero (SDO/ICD‑9) e da C@rdioNet.
 
-	
+Ogni fonte, quando presente, porta una **data di prima evidenza**. Il flusso fa il merge
+delle fonti per `key_anagrafe` e calcola `data_integrata_<patologia> = min(date delle
+fonti)`, più una variabile `<patologia>_from` che registra da quale fonte proviene quella
+data minima. Il soggetto è considerato affetto se la data integrata è valida (`> 0`). La
+sezione [BPCO](#bpco) è l'esempio esteso con tutti i dataset intermedi.
 
-| MACRO CLASSE | DESCRIZIONE MACRO CLASSE |
+```mermaid
+flowchart LR
+  esen[esenzioni]:::l0 --> M{{merge per key_anagrafe<br/>+ min-date}}:::tf
+  lab[laboratorio<br/>marcatori]:::l1 --> M
+  farma[farmaci<br/>classi ATC]:::l1 --> M
+  diagg[diagnosi<br/>aggregate]:::l2 --> M
+  M --> INT[integrata_&lt;patologia&gt;<br/>data + from]:::l3
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef l3 fill:#f8d0d5,stroke:#c04a57,color:#111;
+  classDef tf  fill:#ececec,stroke:#777,color:#111;
+```
+
+---
+
+## Builders
+
+Un **builder** trasforma il grezzo RER (L0) in tabelle di servizio di livello L1–L2,
+riusabili da tutti gli studi. A differenza del datamart, i builder **non dipendono dalla
+coorte**: producono tabelle "master" (in `EGTASK`, `ESAMI`, `SDO`, `DIZ`) che la produzione
+poi taglia sulla coorte specifica. Rispondono alla domanda dell'utente: *"perché nel
+datamart c'è solo la farmaceutica?"* — no: i builder sono molti, uno per famiglia di dati.
+
+```mermaid
+flowchart LR
+  rer[(DWTSISSR<br/>grezzo RER)]:::l0 --> A01{{A01 CREA SDO}}:::tf --> sdo[sdo etichettate]:::l1
+  rer --> A02{{A02 CARDIONET}}:::tf --> card[etichette cardionet]:::l1
+  sdo --> A03{{A03 ASSOCIA}}:::tf
+  card --> A03 --> diagg[diagnosi_aggregate]:::l2
+  rer --> B0{{B0 ESAMI LAB}}:::tf --> esami[esami_*]:::l1
+  rer --> FAR{{FARMATERR}}:::tf --> dsf[dsfarma_*]:::l1
+  diagg --> D01{{D01 DIAGNOSI<br/>INTEGRATE}}:::tf --> integ[integrate_*]:::l3
+  esami --> D01
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef l3 fill:#f8d0d5,stroke:#c04a57,color:#111;
+  classDef tf  fill:#ececec,stroke:#777,color:#111;
+```
+
+### SDO — builder A01
+
+**Definizione.** Etichetta ogni ricovero (SDO) con le categorie diagnostiche ICD‑9
+rilevanti, secondo il dizionario `DIZIONARIO.xlsx` (foglio ICD9).
+
+**Fonti in ingresso.** `DWTSISSR.vfp_ricoveri_sdo_` (ricoveri per anno),
+`vanagrafe_dati_individuali` e i dizionari SDO (`vdizionario_attributi_sdo`,
+`vdizionario_drg`, `vdizionario_strutture`, `vdizionario_territorio`).
+
+**Rami di elaborazione.** Ogni **etichetta** del dizionario è di due tipi:
+- **pura** — una lista di codici ICD‑9, distinti in **diagnostici** (`D…`) e **interventi**
+  (`I…`), es. `ICD9_CM_BPCO = D490,D491,D492,D494,D496`. Il flag `DIAGNOSIN` decide se
+  cercare il codice solo nella **prima** diagnosi del ricovero o in **tutte e sei**.
+- **derivata** — una regola logica su altre etichette interne (`zzz_*`), es.
+  `ICD9_CM_DM_NEUROPATIADM = 1 se (zzz_D2506 e zzz_NEUROPLUS)`. L'ordine di costruzione è
+  dato dalla colonna `ORDER`.
+
+**Output.** `egtask.sdo_generica`, `egtask.sdo_etichettate` e le versioni partizionate
+`sdo.sdo_single1..10` (per parallelizzare l'etichettatura).
+
+### Diagnosi C@rdioNet — builder A02
+
+**Definizione.** Classifica le diagnosi della cartella cardiologica per **descrizione,
+sede e gravità**.
+
+**Fonti.** `DWTSISSR.vfp_cardio_diagnosi` (+ `vfp_cardio_visita` per l'aggancio temporale).
+C@rdioNet è una monotabella senza chiavi esterne: l'unico legame è la `key_anagrafe`.
+
+**Rami.** Ogni etichetta cardionet è un insieme di **triplette** descrizione/sede/gravità
+(foglio CARDIO di `DIZIONARIO.xlsx`), es. "OBESITÀ" con gradi lieve/moderato/severo.
+
+**Output.** `egtask.etichette_cardionet`.
+
+### Diagnosi aggregate — builder A03
+
+**Definizione.** Unisce le etichette SDO (parte ricoveri) e le diagnosi C@rdioNet (parte
+clinica) in un'unica **diagnosi aggregata** `diag_*` di livello L2 — il passaggio che
+"chiude" una diagnosi da fonti amministrative + cliniche.
+
+**Rami.** L'aggancio avviene per **lettera**: nel dizionario la cella `ICD9_<X>*lettera`
+collega l'etichetta SDO alla colonna della diagnosi cardionet con quella lettera.
+Un'etichetta con flag di associazione cardiologica diventa una diagnosi aggregata; le
+aggregate sono **circa 110** (es. `diag_CM_BPCO`, `diag_CM_IRC`, `diag_CM_DM`,
+`diag_CM_ANEMIA`).
+
+**Output.** `egtask.diagnosi_aggregate` — l'input citato da tutte le diagnosi integrate.
+
+```mermaid
+flowchart LR
+  ric[(vfp_ricoveri_sdo)]:::l0 --> A01{{etichetta ICD-9<br/>pure=liste D/I<br/>derivate=regole}}:::tf --> sdo[sdo_etichettate]:::l1
+  card0[(vfp_cardio_diagnosi)]:::l0 --> A02{{triplette<br/>descr/sede/gravita}}:::tf --> etic[etichette_cardionet]:::l1
+  sdo --> A03{{associa per lettera}}:::tf
+  etic --> A03 --> agg[diagnosi_aggregate<br/>110 diag_*]:::l2
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf  fill:#ececec,stroke:#777,color:#111;
+```
+
+### Esami di laboratorio — builder B0
+
+**Definizione.** Aggrega i molti codici DNLAB che identificano lo **stesso esame** in una
+sola categoria, unendo dove serve anche il laboratorio estratto da C@rdioNet. Formalmente
+L1, ma alcuni esami subiscono post‑processing (conversione unità, calcoli). Gli esami sono
+**38**.
+
+**Fonti.** `DWTSISSR.vfp_dnlab_risultati_` (risultati per anno), `vdizionario_dnlab_analisi`
+(mappa codice→esame), `vfp_cardio_esame_lab` (laboratorio C@rdioNet).
+
+**Rami.** Un loop **data‑driven** sul dizionario `ESAMI_LABORATORIO`: per ogni esame, la
+macro `ACCODALAB` accoda anno per anno i risultati, filtrando `key_anagrafe ≠ 0`, l'esame
+richiesto e i risultati non mancanti. Tre livelli di lavorazione: aggregazione semplice;
+conversione di unità di misura; esami multi‑fase o già uniti al laboratorio C@rdioNet.
+
+**Output.** `esami.esami_<esame>` (uno per esame) + il registro master `ESAMI.ESAMI`. Gli
+esami includono: `acr, aer, pcr, per, malbu, protu, creatinina, gfr, emoglobina, hbglicata,
+glicemia, col, hdl, ldl, tri, bnp, probnp, albumina, calcio, fosforo, potassio, sodio, urea,
+uricemia, ferritina, ferro, transferrina, got, gpt, tsh, troponinaHS, ematocrito, …`.
+
+### Farmaceutica territoriale — builder FARMATERR
+
+**Definizione.** Codifica **1705 codici ATC** in **62 classi** non mutuamente esclusive
+(lo stesso ATC può appartenere a più classi), raggruppate per dimensione della tabella
+finale in **13 macro‑classi** (`DSFARMA_<ACRONIMO>`). La profondità è massima (dal 1995),
+senza filtri.
+
+| Macro classe | Descrizione |
 | ----- | ----- |
-| ACP | Agenti\_Cardiovascolari\_Primari |
-| ACSGS | Agenti\_Cardiovascolari\_Secondari\_e\_Gestionali\_del\_Sangue |
-| AMA | Agenti\_Metabolici/Antidiabetici |
-| AIA | Agenti\_Immunomodulatori\_e\_Antinfiammatori |
-| AAA | Agenti\_Anti-infezione\_e\_Antiallergici |
-| AS | Altri\_Sistemi\_(pelle,\_occhi,\_sistema\_nervoso,\_ecc.) |
-| AAD | Altri\_Agenti\_Diversi |
-| BPCO | Broncopneumopatia\_Cronica\_Ostruttiva |
-| DIABETE | Diabete\_Mellito |
-| DM1 | Diabete\_Mellito\_tipo1 |
-| IPERTENSIONE | Ipertensione\_Arteriosa |
-| IPOLIPEMIZZANTI | Agenti\_Ipolipemizzanti |
-| SCC | Scompenso\_cardiaco |
+| ACP | Agenti Cardiovascolari Primari |
+| ACSGS | Agenti Cardiovascolari Secondari e Gestionali del Sangue |
+| AMA | Agenti Metabolici / Antidiabetici |
+| AIA | Agenti Immunomodulatori e Antinfiammatori |
+| AAA | Agenti Anti‑infezione e Antiallergici |
+| AS | Altri Sistemi (pelle, occhi, sistema nervoso, ecc.) |
+| AAD | Altri Agenti Diversi |
+| BPCO | Broncopneumopatia Cronica Ostruttiva |
+| DIABETE | Diabete Mellito |
+| DM1 | Diabete Mellito tipo 1 |
+| IPERTENSIONE | Ipertensione Arteriosa |
+| IPOLIPEMIZZANTI | Agenti Ipolipemizzanti |
+| SCC | Scompenso cardiaco |
 
-Vedi DIZIONARIO FARMACEUTICA: [farma\_aggregata](https://docs.google.com/spreadsheets/u/0/d/1GJGH_qW0zq_sms_itQ0cbGHTWIISMKmpa67tO6bDUss/edit)
+Le tabelle sono in `EGTASK` con nome standard `DSFARMA_<ACRONIMO>` (dizionario
+farmaceutica: `farma_aggregata`). Ogni tabella L1 è generata eseguendo da console lo
+stesso progetto, variando solo la macroclasse da costruire. Colonne in output:
 
-la profondita’ di queste 13 tabelle e’ massima \[1995\], non ci sono filtri.   
-Le tabelle sono in EGTASK con il nome standard DSFARMA\_\[ACRONIMO\]   
-In output le tabelle L1 hanno queste variabili
+1. **KEY_ANAGRAFE** — identificativo del paziente (num)
+2. **data_prestazione** — data di erogazione (date)
+3. **CLASSE** — classe farmacologica (char)
+4. **farmaco** — nome del farmaco (char)
+5. **FARMACO_ATC_COD** — codice ATC (char)
+6. **FARMAPRESCR_PEZZI** — numero di pezzi comprati (num)
+7. **costo** — costo in euro (num)
+8. **FARMACI_DDD_GIORNI** — Defined Daily Dose (char)
+9. **FARMACI_DESC** — descrizione estesa (char)
+10. **FARMACI_SOSTANZA** — codifica di supporto interna (char)
+11. **copertura** — giorni di copertura = pezzi × DDD (num)
+12. **anno_prestazione** — anno di erogazione (num)
 
-1. **KEY\_ANAGRAFE**: Identificativo univoco (anagrafico) del paziente o dell’assistito.  
-    *Tipo: num*  
-2. **data\_prestazione**: Data in cui viene erogata la prestazione (farmaceutica).  
-    *Tipo: date (a seconda della gestione)*  
-3. **CLASSE**: Classe farmacologica (ad es. “BETABLOCCANTI”).  
-    *Tipo: char*  
-4. **farmaco**: Nome del farmaco (commerciale o principio attivo).  
-    *Tipo: char*  
-5. **FARMACO\_ATC\_COD**: Codice ATC del farmaco (classificazione anatomico-terapeutico-chimica).  
-    *Tipo: char*  
-6. **FARMAPRESCR\_PEZZI**: Il numero di pezzi comprati.  
-    *Tipo: num*  
-7. **costo**: Costo del farmaco, espresso in Euro.  
-    *Tipo: num*  
-8. **FARMACI\_DDD\_GIORNI**: Defined Daily Dose.  
-    *Tipo: char*  
-9. **FARMACI\_DESC**: Descrizione estesa del farmaco (denominazione completa).  
-    *Tipo: char*  
-10. **FARMACI\_SOSTANZA:** Altro codice o classificazione di supporto, solitamente interna.  
-     *Tipo: char*  
-11. **copertura**: Giorni di copertura della prescrizione. Calcolata \= Numero pezzi x DDD.  
-     *Tipo: num*  
-12. **anno\_prestazione**: Anno di erogazione del farmaco.  
-     *Tipo: num*
+### Dizionari costruiti
 
-La singola tabella di livello L1 e’ generata eseguendo da console il vbs seguito dal progetto , che e’ sempre lo stesso, e poi dalla variabile che descrive quale macroclasse vogliamo costruire.
+Tabelle di reference L1 costruite dai builder e usate a valle (selezioni, codifiche):
+`diz.selezione_prestazioni`, `diz.statine_dosaggi`, `diz.tabella_codifica_esami`,
+`diz.ESAMI_LABORATORIO` (il dizionario che guida il loop degli esami). Sono lette, mai
+prodotte dalla produzione.
 
-# DATAMART
+### Builder delle diagnosi integrate — D01
 
-# SCORES
+**Definizione.** Versione "builder" (non coorte‑specifica) delle diagnosi integrate,
+prodotta come tabella master in `EGTASK`: `egtask.diagnosi_integrate`, `integrate_bpco`,
+`integrate_diabetici`, `integrate_rcvma`, `integrate_scc`. La logica è la stessa del
+datamart (data minima tra fonti), applicata all'intera popolazione anziché alla coorte.
 
-Gli score sintetizzano il profilo di rischio o comorbidità del soggetto in un unico
-indicatore. Nel registro di produzione hanno `type=score` cinque unità: **SCORE2**,
-**SCOREC**, **CHARLSON**, **ESC** e **CLASSI DI RISCHIO CV** (che aggrega le diagnosi
-integrate e gli score). SCORE2 e SCOREC dipendono dalla diagnosi integrata di diabete.
+> ⚠︎ **Limite.** La maggior parte delle diagnosi integrate è costruita **solo per la
+> coorte** (capitolo Datamart): D01 materializza la versione master solo per alcune patologie.
 
-> Per il flusso di costruzione dettagliato e i diagrammi vedi
-> [`OCVTS_flussi.md`](OCVTS_flussi.md) → capitolo SCORE.
+---
 
-# score2op
+## Datamart
 
-**SCORE2 / SCORE2‑OP** — stima il rischio cardiovascolare a 10 anni (SCORE2 per gli
-adulti, SCORE2‑OP *Older Persons* per gli anziani). È calcolato da età, sesso,
-pressione arteriosa sistolica, colesterolo totale, HDL, fumo e diabete.
-In output: `SCORE2` (valore %), `risk_class_score2` (classe di rischio),
-`flag_missing_score2` (indicatore di input mancanti).
+Il datamart monta, **sulla coorte** di un singolo studio, le variabili finali selezionate
+dal referente clinico tramite un foglio Excel. Ogni unità di produzione (EGP) legge le
+tabelle master dei builder + il grezzo RER e produce un output coorte‑specifico
+`libout.&nome._<x>`. Le sei famiglie: **diagnosi, esami, eventi, prestazioni, score,
+terapia**.
 
-# SCOREC
+### Diagnosi
 
-**SCOREC** — variante **ricalibrata** di SCORE2 sul rischio cardiovascolare a 10 anni,
-prodotta dall'EGP `SCOREC`. Usa gli stessi predittori (età, sesso, pressione
-sistolica, colesterolo totale, HDL, fumo, diabete) con un modello di sopravvivenza a
-coefficienti specifici per sesso, seguito da una trasformazione di calibrazione; il
-risultato è espresso in percentuale. In output: `SCOREC`, `risk_class_scorec`,
-`flag_missing_scorec` (paralleli a SCORE2). Se manca uno tra età, pressione,
-colesterolo o HDL, `SCOREC` non è calcolato.
+Ogni scheda istanzia la [regola della diagnosi integrata](#la-regola-della-diagnosi-integrata):
+merge delle fonti per `key_anagrafe`, `data_integrata_<x> = min(fonti)`, variabile
+`<x>_from`. L'output nel datamart è la coppia `integrata_<x>` (0/1) e `data_integrata_<x>`.
+Le diagnosi aggregate a monte sono costruite dal [builder A03](#diagnosi-aggregate--builder-a03).
 
-# Charlson
+#### IRC
 
-**Charlson Comorbidity Index** — indice di comorbidità costruito dai ricoveri e dalle
-diagnosi aggregate, come somma pesata delle condizioni croniche presenti. In output:
-`charlson_score`.
+**Insufficienza renale cronica.** Integrata da: esenzione (codice `023`, patologia `585`),
+dialisi, marcatori di laboratorio della funzione renale e della proteinuria, e diagnosi
+aggregata (`diag_CM_IRC` / `diag_CM_RENALDIS`).
 
-# ESC
-
-**ESC score** — punteggio di rischio secondo le linee guida della Società Europea di
-Cardiologia (ESC). In output: `escscore`.
-
-# DIAGNOSI
-
-Le diagnosi integrate stabiliscono **se** e **da quando** un soggetto è affetto da una
-patologia, incrociando fonti eterogenee — esenzioni, esami di laboratorio, prescrizioni
-farmaceutiche, diagnosi da ricovero (SDO/ICD‑9) e da C@rdioNet. La regola comune è:
-`data_integrata_<patologia> = min(date delle fonti)`, con una variabile
-`<patologia>_from` che indica da quale fonte proviene la data; il soggetto è affetto se
-la data integrata è valida (> 0). La sezione **BPCO** qui sotto è l'esempio esteso di
-questo schema; le altre patologie lo istanziano cambiando le fonti concrete.
-
-> Flusso dettagliato di ciascuna diagnosi e diagrammi in
-> [`OCVTS_flussi.md`](OCVTS_flussi.md) → capitolo DIAGNOSI.
-
-# Aggregate
-
-Le **diagnosi aggregate** (livello L2) sono il mattone da cui partono le diagnosi
-integrate. Uniscono l'etichettatura ICD‑9 dei ricoveri (SDO) con le diagnosi della
-cartella cardiologica C@rdioNet: ogni etichetta SDO con flag di associazione cardiologica
-viene agganciata alle diagnosi cardionet corrispondenti, producendo circa **110**
-diagnosi aggregate `diag_*` (es. `diag_CM_BPCO`, `diag_CM_IRC`, `diag_CM_DM`,
-`diag_CM_ANEMIA`). Sono materializzate in `EGTASK.DIAGNOSI_AGGREGATE`, l'input citato da
-tutte le diagnosi integrate. Il dizionario che governa questa aggregazione è
-`DIZIONARIO.xlsx` (fogli ICD9 e CARDIO).
-
-# IRC
-
-**Insufficienza renale cronica.** Integrata da: esenzione (codice `023`, patologia
-`585`), dialisi, marcatori di laboratorio della funzione renale e della proteinuria,
-e diagnosi aggregata di ricovero (`diag_CM_IRC` / `diag_CM_RENALDIS`).
-
-Il laboratorio entra con due livelli di gravità per ciascun marcatore:
+Il laboratorio entra con due livelli di gravità per marcatore:
 - **Funzione renale** — il GFR è stimato dalla creatinina con la formula **CKD‑EPI**;
-  la soglia *moderata* è GFR ≤ 60 (con un secondo valore ripetuto entro l'anno), la
-  *severa* è GFR ≤ 45.
-- **Proteinuria** — misurata da ACR, AER, PCR, PER, MALBU o PROTU, con soglie
-  moderata/severa specifiche per marcatore (es. ACR 30 / 300 mg, PCR 150 / 500).
+  soglia *moderata* GFR ≤ 60 (con un secondo valore ripetuto entro l'anno), soglia *severa*
+  GFR ≤ 45. Classi: G1 ≥90, G2 60–89, G3a 45–59, G3b 30–44, G4 15–29, G5 0–14.
+- **Proteinuria** — ACR, AER, PCR, PER, MALBU o PROTU, con soglie moderata/severa
+  specifiche per marcatore (ACR 30/300, PCR 150/500, MALBU 2/20, PROTU 20/200 …), lette dal
+  dizionario del laboratorio. Ogni marcatore è preso **più vicino alla data indice**
+  (finestra dal 2005 alla fine del follow‑up).
 
 La data integrata è la minima tra esenzione, dialisi, diagnosi e le date dei marcatori
-di laboratorio (moderati e severi); `irc_from` registra la fonte. In output:
-`integrata_irc`, `data_integrata_irc`.
+(moderati e severi); `irc_from` registra la fonte. Output: `integrata_irc`,
+`data_integrata_irc`.
 
-# DIABETE
+```mermaid
+flowchart LR
+  esen[(esenzioni<br/>023 + 585)]:::l0 --> Mesen{{prima data<br/>esenzione}}:::tf --> d_esen[data_esen]:::l2
+  creat[(DNLAB creatinina)]:::l0 --> Mgfr{{GFR CKD-EPI<br/>G3b sev / G3a-mod}}:::tf --> d_gfr[gfr mod/sev]:::l1
+  prot[(DNLAB proteinuria<br/>acr/pcr/aer/per/malbu/protu)]:::l0 --> Mprot{{soglie da dizionario<br/>mod/sev}}:::tf --> d_prot[proteinuria mod/sev]:::l1
+  diagg[(diagnosi_aggregate<br/>diag_CM_IRC)]:::l2 --> d_diag[data_diag]:::l2
+  dial[dialisi integrata]:::l3 --> d_dial[data_dialisi]:::l3
+  d_esen --> MIN{{merge key_anagrafe<br/>min-date + irc_from}}:::tf
+  d_gfr --> MIN
+  d_prot --> MIN
+  d_diag --> MIN
+  d_dial --> MIN
+  MIN --> OUT[integrata_irc]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef l3 fill:#f8d0d5,stroke:#c04a57,color:#111;
+  classDef tf  fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-**Diabete mellito.** Integrato da: esenzione (`013`), emoglobina glicata elevata,
-terapia antidiabetica (macro‑classe farmaceutica del diabete) e diagnosi aggregata
-`diag_CM_DM`. La data integrata è la minima tra le fonti; `diabete_from` ne indica
-l'origine. In output: `integrata_dm`, `data_integrata_dm`.
+#### Diabete
 
-A valle dell'integrazione il diabetico è **stratificato per rischio**: danno d'organo
+**Diabete mellito.** Integrato da: esenzione (`013`), emoglobina glicata elevata, terapia
+antidiabetica (macro‑classe AMA/DIABETE) e diagnosi aggregata `diag_CM_DM`. La data
+integrata è la minima tra le fonti; `diabete_from` ne indica l'origine. Output:
+`integrata_dm`, `data_integrata_dm`.
+
+A valle, il diabetico è **stratificato per rischio** (macro `%diabete`): danno d'organo
 `DMTOD` (IRC, cardiopatia ischemica, neuro/retinopatia diabetica, arteriopatia, GFR<60,
-proteinuria), danno d'organo severo `DMSTOD` (GFR<45, o 45–59 con proteinuria, o
-proteinuria grave, o ≥3 fattori combinati), durata ≥10 anni `DM10a`, e le classi finali
-*moderate / high / veryhigh*.
+proteinuria); danno severo `DMSTOD` (GFR<45, o 45–59 con proteinuria, o proteinuria grave,
+o ≥3 fattori combinati); durata ≥10 anni `DM10a`; classi finali *moderate / high / veryhigh*.
 
-# SCOMPENSO
+```mermaid
+flowchart LR
+  esen[(esenzione 013)]:::l0 --> MIN{{merge key_anagrafe<br/>min-date + diabete_from}}:::tf
+  hb[(DNLAB hbglicata<br/>elevata)]:::l0 --> MIN
+  far[dsfarma_diabete<br/>antidiabetici]:::l1 --> MIN
+  dg[(diag_CM_DM)]:::l2 --> MIN
+  MIN --> OUT[integrata_dm]:::out --> RC{{classi rischio<br/>DMTOD/DMSTOD/DM10a}}:::tf --> RCV[moderate/high/veryhigh]:::l4
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef l4 fill:#e2d6f3,stroke:#8a63c0,color:#111;
+  classDef tf  fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-**Scompenso cardiaco cronico (SCC).** Integrato da: esenzione, terapia specifica dello
+#### Scompenso
+
+**Scompenso cardiaco cronico (SCC).** Integrato da esenzione, terapia specifica dello
 scompenso, ricoveri con codici ICD‑9 secondo la definizione **PNE** (via diagnosi
-aggregate) e diagnosi C@rdioNet. La data integrata è la minima tra le fonti;
-`scc_from` ne indica l'origine. In output: `integrata_scc`, `data_integrata_scc`.
+aggregate) e diagnosi C@rdioNet. La data integrata è la minima tra le fonti; `scc_from` ne
+indica l'origine. Output: `integrata_scc`, `data_integrata_scc`.
 
-# BPCO
+> ⚠︎ **Limite.** La ricetta è inline (nessuna macro dedicata): codici e soglie esatti da
+> leggere nel flusso `SCOMPENSO` / `SCCxPDTAL`.
 
-**Merge Iniziale (temp\_farma01):**  
- I dati provenienti da *egtask.dsfarma\_bpco* e dalla coorte (\&coorte.) vengono uniti per creare `temp_farma01`.
+#### BPCO
 
-**Elaborazione per Anno:**  
- Da `temp_farma01` si genera `temp_anno00` che viene trasposto in due dataset (date e quantità) e successivamente riunito in `temp_anno01`. Dopo il calcolo dei contatori e la definizione di `limit_anno`, si calcola `farma_anno`.
+**Broncopneumopatia cronica ostruttiva.** È l'esempio **esteso** dello schema della
+diagnosi integrata, con tutti i dataset intermedi.
 
-**Elaborazione per Classe:**  
- Parallelamente, `temp_classe00` viene processato con trasposizioni, merge e calcoli dei contatori (macro `limit_classe`) per ottenere `farma_classe`.
+**Merge iniziale (`temp_farma01`).** I dati di `egtask.dsfarma_bpco` (con filtro
+`classe ≠ 'OSSIGENO'`) e della coorte (`&coorte.`, con almeno `key_anagrafe` e
+`data_indice`) vengono uniti in `temp_farma01`.
 
-**Altri Rami (Diagnosi, Esenzioni, SDO):**
+**Ramo "anno".** Da `temp_farma01` si genera `temp_anno00` (ordinato per key_anagrafe /
+data_indice / data_prescrizione), trasposto in due dataset (date con prefisso `dacq`,
+quantità con prefisso `acq`) e riunito in `temp_anno01`. Dopo i contatori
+(`temp_counter_anno01/02`, macro `limit_anno`) si calcola `farma_anno` — la data d'inizio
+acquisto se la somma raggiunge almeno **5** in un intervallo.
 
-* `dia_bpcodadiag` raccoglie le informazioni diagnostiche da *EGTASK.DIAGNOSI\_AGGREGATE*.
+**Ramo "classe".** In parallelo `temp_classe00` viene trasposto e processato (contatori
+`temp_counter_classe01/02`, macro `limit_classe`) per ottenere `farma_classe` — se la
+somma raggiunge almeno **3**.
 
-* Le esenzioni vengono gestite in due flussi: uno che produce `dia_esenti` e l’altro `dia_esclusi`.
+**Altri rami.** `dia_bpcodadiag` (da `EGTASK.DIAGNOSI_AGGREGATE`, diagnosi BPCO unite alla
+coorte); esenzioni gestite in due flussi → `dia_esenti` (prima data d'esenzione) e
+`dia_esclusi`; SDO (codici ICD‑9 asma da `DIZ.DIZIONARIO_BPCOINT`, merge con
+`egtask.sdo_generica`, macro `%unica`) → `dia_sdo493`.
 
-* I dati SDO vengono elaborati per ottenere `dia_sdo493`.
+**Merge finale.** Coorte + `farma_anno` + `farma_classe` + `dia_esenti` + `dia_esclusi` +
+`dia_sdo493` + `dia_bpcodadiag` → dataset integrato; `data_integrata_bpco` = minimo tra
+diagnosi, farma_anno, farma_classe ed esenzione; `bpco_from` indica la fonte. Output:
+`integrata_bpco`, `data_integrata_bpco`.
 
-**Merge Finale:**  
- Tutte le informazioni (coorte, farma\_anno, farma\_classe, diagnostica, esenzioni, SDO) vengono unite nel dataset finale (integrata\_bpco) che contiene la data minima tra le fonti e la variabile che indica da quale fonte proviene la data.
+```mermaid
+flowchart LR
+  dsf[(dsfarma_bpco)]:::l1 --> T0{{merge coorte<br/>escl. OSSIGENO}}:::tf --> tf01[temp_farma01]:::l2
+  tf01 --> RA{{ramo anno<br/>somma >=5}}:::tf --> fa[farma_anno]:::l2
+  tf01 --> RC{{ramo classe<br/>somma >=3}}:::tf --> fc[farma_classe]:::l2
+  esen[(esenzioni)]:::l0 --> de[dia_esenti/esclusi]:::l2
+  sdo[(sdo_generica<br/>ICD9 asma)]:::l1 --> ds[dia_sdo493]:::l2
+  dg[(diagnosi_aggregate<br/>BPCO)]:::l2 --> dd[dia_bpcodadiag]:::l2
+  fa --> MIN{{min-date + bpco_from}}:::tf
+  fc --> MIN
+  de --> MIN
+  ds --> MIN
+  dd --> MIN
+  MIN --> OUT[integrata_bpco]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf  fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-Di seguito trovi una panoramica dello schema dei dataset che vengono creati nel codice e il modo in cui sono collegati. L'idea è che il codice parta da alcune fonti dati (come la tabella delle prescrizioni farmaceutiche, la coorte, le diagnosi, le esenzioni e i codici SDO) e, mediante trasformazioni e transposizioni, generi in parallelo due rami di elaborazione (per “anno” e per “classe”) che poi vengono combinati con le altre fonti per produrre il dataset finale integrato.
-
-Di seguito un riassunto dei principali passaggi e dataset:
-
-1. **Merge iniziale (temp\_farma01):**
-
-   * **Input:**
-
-     * *egtask.dsfarma\_bpco* (con filtri su `classe` ≠ 'OSSIGENO')
-
-     * *\&coorte.* (contenente almeno `key_anagrafe` e `data_indice`)
-
-   * **Output:** `temp_farma01`
-
-2. **Branch elaborazione “anno”:**
-
-   * **Sorting:**
-
-     * `temp_farma01` → `temp_anno00` (ordinato per key\_anagrafe, data\_indice, data\_prescrizione)
-
-   * **Transposizioni:**
-
-     * `temp_anno00` → `temp_anno01d` (trasposizione di *data\_prescrizione* con prefisso `dacq`)
-
-     * `temp_anno00` → `temp_anno01c` (trasposizione di *conf* con prefisso `acq`)
-
-   * **Merge e contatori:**
-
-     * Unione in `temp_anno01` e calcolo di conteggi/statistiche in `temp_counter_anno01` e `temp_counter_anno02` (definisce la macro variabile `limit_anno`)
-
-   * **Elaborazione finale:**
-
-     * Con i dati transposti e la macro `limit_anno`, viene calcolata la data d'inizio dell’acquisto in `farma_anno` (se la somma di acquisti raggiunge almeno 5 in un intervallo)
-
-3. **Branch elaborazione “classe”:**
-
-   * **Sorting:**
-
-     * `temp_farma01` → `temp_classe00` (ordinato per key\_anagrafe, data\_indice, classe, data\_prescrizione)
-
-   * **Transposizioni:**
-
-     * `temp_classe00` → `temp_classe01d` (trasposizione di *data\_prescrizione* per ciascuna classe)
-
-     * `temp_classe00` → `temp_classe01c` (trasposizione di *conf*)
-
-   * **Merge e contatori:**
-
-     * Unione in `temp_classe01` e calcolo dei contatori in `temp_counter_classe01` e `temp_counter_classe02` (definisce la macro variabile `limit_classe`)
-
-   * **Elaborazione finale:**
-
-     * Viene elaborato `temp_classe02` con il loop sui dati transposti per definire la data d'inizio d’acquisto per classe, che viene sintetizzata in `farma_classe` (se la somma raggiunge almeno 3\)
-
-4. **Elaborazioni complementari:**
-
-   * **Diagnosi:**
-
-     * `dia_bpcodadiag` è creato da *EGTASK.DIAGNOSI\_AGGREGATE* (filtrando le diagnosi BPCO) unite alla coorte
-
-   * **Esenzioni:**
-
-     * Dalle tabelle *DWTSISSR.VFS\_ASSISTITI\_ESENTI* e *VDIZIONARIO\_ESENZIONI* si crea `temp_esenti00`
-
-     * Successivamente, in base al codice di esenzione, si dividono in:
-
-       * `temp_esenti01` → da cui si ottiene `dia_esenti` (la prima data d'esenzione per ciascun soggetto)
-
-       * `temp_esclusi01` → da cui si ottiene `dia_esclusi` (soggetti da escludere)
-
-   * **Codici SDO:**
-
-     * Vengono selezionati i codici ICD9 relativi all’asma da *DIZ.DIZIONARIO\_BPCOINT* (in `temp_squery`)
-
-     * Si esegue il merge di *egtask.sdo\_generica* e la coorte in `temp_sdo01`
-
-     * Tramite una macro (%unica) viene generato `temp_sdo_single` che viene poi sintetizzato in `dia_sdo493` (se la condizione ICD9\_CM\_ASMA è soddisfatta)
-
-5. **Dataset finale integrato:**
-
-   * Il dataset finale (chiamato in base alla macro variabile \&dsoutput, ad esempio *temp\_integrata\_bpco* o *libout.\&nome.\_integrata\_bpco*) è ottenuto con il merge dei seguenti dataset:
-
-     * **Coorte (\&coorte.)**
-
-     * **farma\_classe**
-
-     * **farma\_anno**
-
-     * **dia\_esenti**
-
-     * **dia\_esclusi**
-
-     * **dia\_sdo493**
-
-     * **dia\_BPCOdaDIAG** (che corrisponde a `dia_bpcodadiag`)
-
-   * Viene calcolata la variabile `data_integrata_bpco` come il minimo tra le date provenienti da diagnosi, farma\_anno, farma\_classe ed esenzione, e in base a questa viene assegnata la variabile `integrata_bpco` e la provenienza (`bpco_from`).
-
-# COVID
+#### COVID
 
 **Infezione da SARS‑CoV‑2.** Integrata dalle segnalazioni/tamponi COVID ed eventuali
-ricoveri correlati. In output: `integrata_covid`, `data_integrata_covid` (variabili non
+ricoveri correlati. Output: `integrata_covid`, `data_integrata_covid` (variabili non
 trattenute di default nel datamart).
 
-# FA
+> ⚠︎ **Limite.** Materiale scarso: nessuna versione L3 master; la ricetta (fonti/finestre)
+> è inline nel flusso COVID.
 
-**Fibrillazione atriale.** Integrata da esenzione, terapia anticoagulante, diagnosi
-aggregata di FA e diagnosi C@rdioNet. La data integrata è la minima tra le fonti;
-`fa_from` ne indica l'origine. In output: `integrata_fa`, `data_integrata_fa`.
+#### Fibrillazione atriale
 
-# IPERTENSIONE
+**FA.** Integrata da esenzione, terapia anticoagulante, diagnosi aggregata di FA e diagnosi
+C@rdioNet. La data integrata è la minima tra le fonti; `fa_from` ne indica l'origine.
+Output: `integrata_fa`, `data_integrata_fa`.
 
-**Ipertensione arteriosa.** Integrata da esenzione, terapia antipertensiva, valori
-pressori (parametri funzionali C@rdioNet) e diagnosi aggregata. In output:
-`integrata_ipertensione`, `data_integrata_ipertensione`.
+#### Ipertensione
 
-# DISLIPIDEMIA
+**Ipertensione arteriosa.** Integrata da esenzione, terapia antipertensiva, valori pressori
+(parametri funzionali C@rdioNet) e diagnosi aggregata. Output: `integrata_ipertensione`,
+`data_integrata_ipertensione`.
+
+#### Dislipidemia
 
 **Dislipidemia.** Integrata da esenzione, terapia ipolipemizzante e marcatori lipidici
-(colesterolo totale, LDL). In output: `integrata_dislipidemia`,
-`data_integrata_dislipidemia`.
+(colesterolo totale, LDL). Output: `integrata_dislipidemia`, `data_integrata_dislipidemia`.
 
-# ANEMIA
+#### Anemia
 
 **Anemia.** Integrata da emoglobina sotto soglia, diagnosi aggregata `diag_CM_ANEMIA`
-(ICD‑9 280–285) ed esenzione. In output: `integrata_anemia`, `data_integrata_anemia`.
+(ICD‑9 280–285) ed esenzione. Output: `integrata_anemia`, `data_integrata_anemia`.
 
-# Rischio CVMA
+#### Rischio CVMA
 
 **Rischio cardiovascolare / malattia aterosclerotica.** A differenza delle altre, è una
-variabile di **livello L4** costruita nel flusso delle classi di rischio, non una
-diagnosi ricavata direttamente dalle fonti L0. In output: `integrata_rcvma`,
-`data_integrata_rcvma`.
+variabile di **livello L4** costruita nel flusso delle classi di rischio, non una diagnosi
+ricavata direttamente dalle fonti L0. Output: `integrata_rcvma`, `data_integrata_rcvma`.
 
-# ipercol familiare
+> ⚠︎ **Limite.** La catena non risale a L0 (parte da classi di rischio già calcolate).
+
+#### Ipercolesterolemia familiare
 
 **Ipercolesterolemia familiare.** Integrata da valori di LDL molto elevati, terapia
-ipolipemizzante potente (incluse PCSK9 e inclisiran) e criteri clinici/diagnostici.
-In output: `integrata_ipercolfam`, `data_integrata_ipercolfam`.
+ipolipemizzante potente (incluse PCSK9 e inclisiran) e criteri clinici/diagnostici. Output:
+`integrata_ipercolfam`, `data_integrata_ipercolfam`.
 
-# microalbuminuria
+#### Microalbuminuria
 
-**Microalbuminuria.** Definita dal marcatore urinario con soglia **dipendente
-dall'unità di misura**: ≥ 3 mg/24h, ≥ 2 mg/dL, ≥ 20 mg/L, ≥ 30 mg/g. In output:
-`integrata_microalbuminuria`, `data_integrata_microalbuminuria`.
+**Microalbuminuria.** Definita dal marcatore urinario con soglia **dipendente dall'unità di
+misura** (macro `%microalb`): ≥ 3 mg/24h, ≥ 2 mg/dL, ≥ 20 mg/L, ≥ 30 mg/g → positiva.
+Output: `integrata_microalbuminuria`, `data_integrata_microalbuminuria`.
 
-# obesità
+#### Obesità
 
-**Obesità.** Integrata da antropometria/BMI (parametri funzionali C@rdioNet: peso,
-altezza, circonferenza addominale, con gradi lieve/moderato/severo) e diagnosi.
-In output: `integrata_obesita`, `data_integrata_obesita`.
+**Obesità.** Integrata da antropometria/BMI (parametri funzionali C@rdioNet: peso, altezza,
+circonferenza addominale, con gradi lieve/moderato/severo) e diagnosi. Output:
+`integrata_obesita`, `data_integrata_obesita`.
 
-# dialisi
+#### Dialisi
 
 **Dialisi.** Integrata da esenzione per dialisi, prestazioni ambulatoriali di dialisi e
-ricoveri. È anche una delle **fonti dell'IRC** (fornisce `data_dialisi`). In output:
+ricoveri. È anche una delle **fonti dell'IRC** (fornisce `data_dialisi`). Output:
 `integrata_dialisi`, `data_integrata_dialisi`.
 
-# ESAMI
+```mermaid
+flowchart LR
+  esen[(esenzione)]:::l0 --> MIN{{merge coorte<br/>min-date + &lt;x&gt;_from}}:::tf
+  lab[marcatore laboratorio]:::l1 --> MIN
+  far[terapia della classe]:::l1 --> MIN
+  dg[(diagnosi aggregata)]:::l2 --> MIN
+  MIN --> OUT[integrata_&lt;x&gt;]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-Gli esami comprendono il **laboratorio** (DNLAB + laboratorio C@rdioNet) e gli **esami
-strumentali** cardiologici e respiratori (ECO, ECG, spirometrie, fenotipo, parametri
-funzionali), tutti agganciati alla coorte.
+> Lo schema sopra vale per ipertensione, dislipidemia, anemia, ipercolesterolemia
+> familiare, obesità e dialisi: cambiano le fonti concrete (marcatore, classe farmaci,
+> codici diagnosi), non lo schema.
 
-# LABORATORIO
+### Esami
 
-La tabella esami e’ una tabella formalmente di tipo L1 poiche’ derivazione diretta da tabelle L0, ma ci sono alcune tabelle costruite da varie operazioni di aggregazione sia tra diversi esami del DNLAB si acon esami estratti dal laboratorio di carionet. Ci sono in tutto 38\.
+Gli esami comprendono il **laboratorio** e gli **esami strumentali** cardiologici e
+respiratori, tutti agganciati alla coorte.
 
-acr aer pcr per bnp probnp creatinina emoglobina calcio lipoproteina A ldl hdl tri col protu urine .
+#### Laboratorio
 
-Gran Parte di essi e’ una semplice aggregazione di diversi codici di laboratorio in una sola categoria, per l’appunto l’esame. Alcuni subiscono un post processing semplice come la conversione delle unita’ di misura per avere un dataset omogeneo. Alcuni invece sono processati in piu’ fasi. 
+**Definizione.** Aggancia alla coorte gli esami costruiti dal [builder
+B0](#esami-di-laboratorio--builder-b0), tenendo il valore **più vicino alla data indice**
+(finestra dal 2005 alla fine del follow‑up, risultati non mancanti; macro `get_lab`).
 
-Alcuni sono gia’ aggregati con gli esami estratti dal laboratorio di Cardionet.
+**Output (14 su 38 trattenute).** `GFR_CKDEPI`, `GFR_BIS1`, `LAB_ACR`, `LAB_AER`,
+`LAB_ALBUMINA`, `LAB_BNP`, `LAB_COL`, `LAB_CRCL`, `LAB_CREATININA`, `LAB_EMOGLOBINA`,
+`LAB_GLICEMIA`, `LAB_HBGLICATA`, `LAB_HDL`, `LAB_LDL`. Gli altri (PCR, PER, MALBU, PROTU,
+elettroliti, funzione epatica, ferro, TSH, troponina, …) sono calcolati ma non trattenuti
+di default.
 
-Nel datamart, ciascun esame è agganciato alla coorte tenendo il valore **più vicino
-alla data indice** (finestra dal 2005 alla fine del follow‑up, risultati non mancanti).
-Tra i 38 esami, quelli trattenuti di default sono: `GFR_CKDEPI`, `GFR_BIS1`, `LAB_ACR`,
-`LAB_AER`, `LAB_ALBUMINA`, `LAB_BNP`, `LAB_COL`, `LAB_CRCL`, `LAB_CREATININA`,
-`LAB_EMOGLOBINA`, `LAB_GLICEMIA`, `LAB_HBGLICATA`, `LAB_HDL`, `LAB_LDL`. Gli altri
-(PCR, PER, MALBU, PROTU, elettroliti, funzione epatica, ferro, TSH, troponina, …) sono
-calcolati e disponibili ma non trattenuti salvo richiesta.
+```mermaid
+flowchart LR
+  dnlab[(DNLAB per esame)]:::l0 --> B0{{builder B0<br/>accodalab per anno<br/>key diverso 0, non missing}}:::tf --> esami[esami_&lt;esame&gt;]:::l1
+  esami --> GL{{get_lab: join coorte<br/>2005..fine_fup<br/>piu vicino a data indice}}:::tf --> lab[LAB_&lt;esame&gt; / GFR]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-# ECO ECG
+#### ECO ed ECG
 
 Esami strumentali cardiologici estratti da C@rdioNet: **ecocardiografia** (ECO) ed
 **elettrocardiografia** (ECG), agganciati alla coorte. Il catalogo è ampio (113 variabili
-ECO, 17 ECG) e la selezione delle misure da trattenere è specifica dello studio.
+ECO, 17 ECG) e la selezione delle misure è specifica dello studio. Fonti:
+`vfp_cardio_eco`, `vfp_cardio_ecg_mortara`.
 
-# spirometrie
+> ⚠︎ **Limite.** Nessuna macro dedicata: la selezione è inline nel flusso ECO/ECG.
 
-Esami di funzionalità respiratoria (spirometrie) ricavati dai flussi ambulatoriale e
-delle prestazioni sanitarie, accodati per anno e agganciati alla coorte.
+#### Spirometrie
 
-# fenotipo
+Esami di funzionalità respiratoria ricavati dai flussi ambulatoriale e delle prestazioni
+sanitarie (`vfp_ambulatoriale_prestaz_`, macro `accoda_spiro*`), accodati per anno.
 
-Fenotipizzazione morfologica cardiaca da C@rdioNet (ecocardiografia morfologica): un
-insieme di variabili descrittive della struttura cardiaca agganciate alla coorte.
+#### Fenotipo
 
-# par. funzionali
+Fenotipizzazione morfologica cardiaca da C@rdioNet (ecocardiografia morfologica): variabili
+descrittive della struttura cardiaca agganciate alla coorte. Fonti: `vfp_cardio_eco`,
+`vfp_cardio_eco_morfologica`.
 
-Parametri funzionali e clinici da C@rdioNet. Catalogo molto ampio (574 variabili); tra i
-trattenuti di default: pressione sistolica e diastolica (`PAS`, `PAD`), frequenza
-cardiaca (`FC`), saturazione (`SO2`), peso, altezza, circonferenza addominale, classe
-`NYHA` e `TTR(INR)`.
+#### Parametri funzionali
 
-# EVENTI
+Parametri funzionali e clinici da C@rdioNet (`vfp_cardio_paramfunz`). Catalogo molto ampio
+(574 variabili); tra i trattenuti: `PAS`, `PAD`, `FC`, `SO2`, peso, altezza, circonferenza
+addominale, classe `NYHA`, `TTR(INR)`.
+
+> ⚠︎ **Limite.** La ricetta di selezione non è in una macro dedicata.
+
+### Eventi
 
 Gli eventi combinano più fonti (ricoveri, decessi, laboratorio) in eventi clinici
-complessi; la data dell'evento è tipicamente la **minima** tra gli eventi elementari che
-lo compongono.
+complessi; la data è tipicamente la **minima** tra gli eventi elementari.
 
-# Male
+#### MALE
 
-**MALE** (Major Adverse Limb Event) — evento avverso maggiore agli arti. In output:
-`male` (0/1), `data_male`, `distmale` (distanza dalla data indice).
+**Major Adverse Limb Event** — evento avverso maggiore agli arti. Output: `male` (0/1),
+`data_male`, `distmale`.
 
-# Mace 3p 5p
+#### MACE 3p e 5p
 
-**MACE** (Major Adverse Cardiovascular Event) a 3 e 5 punti. `data_mace3` è la minima
-tra decesso, infarto e stroke; la versione a 5 punti aggiunge ulteriori componenti.
-In output: `mace3`, `mace5`, `data_mace3`, `data_mace5`, `dist3pi`, `dist5pi`.
+**Major Adverse Cardiovascular Event** a 3 e 5 punti; `data_mace3` è la minima tra decesso,
+infarto e stroke (la 5p aggiunge ulteriori componenti). Output: `mace3`, `mace5`,
+`data_mace3`, `data_mace5`, `dist3pi`, `dist5pi`.
 
-# eventi ricovero
+#### Eventi di ricovero
 
-**Eventi di ospedalizzazione** classificati per tipo (cardiovascolari/non, per apparato).
-Ricavati dalle SDO. Tra le variabili trattenute: ricoveri CV e non‑CV, IRC, malattia
-renale, dialisi, interventi, scompenso, valvole, ASCVD multisito.
+Eventi di ospedalizzazione classificati per tipo (CV/non‑CV, per apparato), dalle SDO. Tra
+le variabili trattenute: ricoveri CV e non‑CV, IRC, malattia renale, dialisi, interventi,
+scompenso, valvole, ASCVD multisito.
 
-# emo maggiori
+#### Emorragie maggiori
 
-**Emorragie maggiori** — eventi emorragici rilevanti, distinti per tipo. In output:
-`emomag_a`, `emomag_f` con le rispettive date `data_emomag_a`, `data_emomag_f`.
+Eventi emorragici rilevanti, distinti per tipo (macro `accoda_emod`). Output: `emomag_a`,
+`emomag_f`, `data_emomag_a`, `data_emomag_f`.
 
-# PRESTAZIONI
+```mermaid
+flowchart LR
+  sdo[(SDO / DNLAB / anagrafe)]:::l0 --> EV{{eventi elementari<br/>infarto/stroke/decesso...}}:::tf --> comp[componenti evento]:::l2
+  comp --> MIN{{data = min componenti}}:::tf --> OUT[mace/male/eventi_ric/emomag]:::out
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-Le prestazioni accodano alla coorte, con conteggi per anno, le erogazioni provenienti dal
-**CUP** (prenotazioni del centro unico), da **C@rdioNet** e dal **Pronto Soccorso**.
-Le prestazioni CUP sono filtrate per tipologia dando origine ai diversi rami sotto.
+### Prestazioni
 
-# CUP altro
+Le prestazioni accodano alla coorte, con conteggi per anno, le erogazioni dal **CUP**, da
+**C@rdioNet** e dal **Pronto Soccorso**. Le prestazioni CUP sono filtrate per tipologia
+(macro `accodacupprest` + `accodacupstrut`), dando origine ai rami sotto.
 
-Prestazioni CUP non riconducibili alle categorie specifiche (residuale). Output
-`prestazioni_altro`.
+| Prestazione | Fonte | Output coorte |
+|---|---|---|
+| CUP altro | `vfp_cup_prestsan_`, `vdizionario_cup_prestsan` | `prestazioni_altro` |
+| CUP ECG | CUP (filtro ECG) | `prestazioni_ecg` |
+| CUP ECO | CUP (filtro ECO) | `prestazioni_eco` |
+| CUP ecovasco | CUP (ecografia vascolare) | `prestazioni_ecov` |
+| CUP ecocardio | CUP (ecocardiografia) | `prestazioni_ecoc` |
+| CUP tutte | CUP (nessun filtro) | `prestazioni_tutte` |
+| CUP spiro | ambulatoriale/CUP (spirometria) | `prestazioni_spiro` |
+| CUP visite | CUP (visite specialistiche) | `prestazioni_visite` |
+| prest. C@rdioNet | `vfp_cardio_visita` | `prestazioni_cardionet` |
+| pronto soccorso | `vfp_ps_episodi_` | `pronto_soccorso` |
 
-# CUP ecg
+```mermaid
+flowchart LR
+  cup[(CUP prestsan)]:::l0 --> AP{{accodacupprest per anno<br/>filtro tipo prestazione}}:::tf
+  strut[(CUP strutture)]:::l0 --> AS{{accodacupstrut}}:::tf
+  AP --> merge{{merge coorte<br/>conteggi per anno}}:::tf
+  AS --> merge --> OUT[prestazioni_&lt;tipo&gt;]:::out
+  ps[(PS episodi)]:::l0 -.-> OUT
+  card[(cardionet visite)]:::l0 -.-> OUT
+  classDef l0 fill:#d9e8fb,stroke:#4a78b5,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-Prestazioni CUP di elettrocardiografia. Output `prestazioni_ecg`.
+> ⚠︎ **Limite.** Nessuna prestazione ha un foglio nel datamart‑builder: la lista variabili
+> di output va letta dalle colonne del dataset prodotto.
 
-# CUP eco
+### Score
 
-Prestazioni CUP di ecografia (generica). Output `prestazioni_eco`.
+Gli score sintetizzano il profilo di rischio o comorbidità in un unico indicatore. Cinque
+unità hanno `type=score`: **SCORE2**, **SCOREC**, **Charlson**, **ESC** e **classi di
+rischio CV** (che aggrega diagnosi integrate e score). SCORE2 e SCOREC dipendono dal diabete
+integrato.
 
-# CUP ecovasco
+#### SCORE2 e SCORE2-OP
 
-Prestazioni CUP di ecografia vascolare. Output `prestazioni_ecov`.
+Rischio cardiovascolare a 10 anni (SCORE2 per gli adulti, SCORE2‑OP *Older Persons* per gli
+anziani), da età, sesso, pressione sistolica, colesterolo totale, HDL, fumo e diabete.
+Output: `SCORE2`, `risk_class_score2`, `flag_missing_score2`.
 
-# CUP ecocardio
+#### SCOREC
 
-Prestazioni CUP di ecocardiografia. Output `prestazioni_ecoc`.
+Variante **ricalibrata** di SCORE2. Usa gli stessi predittori (età, sesso, pressione
+sistolica, colesterolo totale, HDL, fumo, diabete) con un modello di sopravvivenza a
+coefficienti specifici per sesso, seguito da una trasformazione di calibrazione; il
+risultato è in percentuale. Se manca uno tra età, pressione, colesterolo o HDL, `SCOREC`
+non è calcolato. Output: `SCOREC`, `risk_class_scorec`, `flag_missing_scorec`. Nel grafo:
+EGP `SCOREC`, flusso `SCORECAL`, output L4 `CLINICO.COORTE_SCOREC`.
 
-# CUP tutte
+```mermaid
+flowchart LR
+  par[eta/sesso/pas]:::l1 --> SC{{SCORE2 ricalibrato<br/>coeff. per sesso<br/>scale1/scale2}}:::tf
+  lab[col/hdl]:::l1 --> SC
+  dm[diabete integrato]:::l3 --> SC
+  SC --> OUT[SCOREC<br/>risk_class_scorec<br/>flag_missing_scorec]:::l4
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l3 fill:#f8d0d5,stroke:#c04a57,color:#111;
+  classDef l4 fill:#e2d6f3,stroke:#8a63c0,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+```
 
-Tutte le prestazioni CUP, senza filtro di tipologia. Output `prestazioni_tutte`.
+#### Charlson
 
-# CUP spiro
+**Charlson Comorbidity Index** — indice di comorbidità costruito dai ricoveri e dalle
+diagnosi aggregate, come somma pesata delle condizioni croniche. Output: `charlson_score`.
 
-Prestazioni CUP/ambulatoriali di spirometria. Output `prestazioni_spiro`.
+#### ESC
 
-# CUP visite
+**ESC score** — punteggio di rischio secondo le linee guida della Società Europea di
+Cardiologia. Output: `escscore`.
 
-Prestazioni CUP di visita specialistica. Output `prestazioni_visite`.
+#### Classi di rischio cardiovascolare
 
-# prest Cardionet
+Classificazione finale del rischio CV (CLRCV, L4), che combina diagnosi integrate,
+laboratorio e parametri. Prodotta nel flusso CLASSI_RISCHIO. Output: `classi_rischio`
+(oltre alle `integrata_*` per diagnosi).
 
-Prestazioni/visite registrate in C@rdioNet. Output `prestazioni_cardionet`.
+```mermaid
+flowchart LR
+  diag[diagnosi integrate L3]:::l3 --> CR{{classi rischio CV}}:::tf
+  lab[laboratorio]:::l1 --> CR
+  par[parametri funzionali]:::l1 --> CR
+  CR --> OUT[classi_rischio / score]:::l4
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l3 fill:#f8d0d5,stroke:#c04a57,color:#111;
+  classDef l4 fill:#e2d6f3,stroke:#8a63c0,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+```
 
-# pronto soccorso
+### Terapia
 
-Accessi al Pronto Soccorso (episodi PS) agganciati alla coorte. Output `pronto_soccorso`.
+La terapia descrive i farmaci del soggetto da due fonti: la **farmaceutica territoriale** e
+la **terapia registrata in C@rdioNet**.
 
-# TERAPIA
+#### Terapia farmaceutica
 
-La terapia descrive i farmaci del soggetto da due fonti: la **farmaceutica territoriale**
-(sistema pubblico di distribuzione del farmaco) e la **terapia registrata in C@rdioNet**.
+Terapia farmaceutica territoriale agganciata alla coorte, costruita sopra le macro‑classi
+`dsfarma_*` del [builder FARMATERR](#farmaceutica-territoriale--builder-farmaterr), con
+finestre temporali **diverse per protocollo**:
 
-# farmaceutica terr.
+- **CLINICO:** `data_indice − 90 ≤ data_prescrizione ≤ data_indice + 180`. Output: potenza
+  ipolipemizzanti (indice e follow‑up, incl. PCSK9/inclisiran), somma prescrizioni a 6/12
+  mesi per classe, flag classe follow‑up 6 mesi / anamnesi 3 mesi.
+- **PDTA:** `data_uscita_indice ≤ data_prescrizione ≤ data_uscita_indice + 730`. Output:
+  somma copertura annua per classe, flag 0/1 di classe, `last_AA/ASA/NAOTAO`, somma ATC per
+  persona.
+- **EPI4M:** `data_indice ≤ data_prescrizione ≤ data_indice + 365`. Output: potenza
+  ipolipemizzanti (indice `−365..0`, follow‑up `+270..+360`), somma grezza ATC.
 
-## protocollo CLINICO
+Output: `farmaceutica` (tra le trattenute: `PCSK9I`, `INCLISIRAN`).
 
-filtro date: t2.data\_indice \- 90 \<= t1.data\_prescrizione \<= t2.data\_indice \+ 180  
-in output:
+```mermaid
+flowchart LR
+  dsf[(dsfarma_* / cardio_terapia)]:::l1 --> W{{finestra per protocollo<br/>CLINICO -90..+180<br/>PDTA 0..+730<br/>EPI4M 0..+365}}:::tf
+  W --> AGG{{somma/copertura per classe<br/>potenza ipolipemizzanti}}:::tf --> OUT[farmaceutica / terapiacardionet]:::out
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
 
-- [ ] potenza ipolipemizzanti \[compresi pcsk9 e inclisiran\]:  
-      - [ ] indice  
-      - [ ] fup \[il fup e’ il piu’ vicino all’LDL preso ad 1 anno dalla data indice, se non c’e’, si prende la potenza piu’ vicina a 12 mesi dalla data indice.  
-- [ ] somma 6mesi, 12 mesi delle prescrizioni per persona, data\_indice e classe.  
-- [ ] 0/1 classe fup 6 mesi   
-- [ ] 0/1 classe anam 3 mesi
+#### Terapia C@rdioNet
 
-## protocollo PDTA
+La terapia farmacologica registrata nella cartella cardiologica, aggregata in classi
+(ACE‑inibitori/sartani, betabloccanti, antiaggreganti, anticoagulanti, antidiabetici,
+calcio‑antagonisti, diuretici, ipolipemizzanti). Per ogni classe: presenza, codice ATC,
+numero di confezioni, quantità e sostanza (`<classe>`, `_ATCCOD`, `_CONF`, `_QTA`, `_SOST`).
+Fonti: `vfp_cardio_terapia`, `vdizionario_farmaci_atc`, `vdizionario_farmaci_sost`. Output:
+`terapiacardionet` (40 variabili trattenute su 190).
 
-filtro date: (t2.data\_uscita\_indice\<=t1.data\_prescrizione\<=t2.data\_uscita\_indice+365\*2)  
-in ouput:
+### Le due viste del datamart
 
-- [ ] somma della copertura nell’anno per classe  
-- [ ] colonne 0/1 delle classi  
-- [ ] last\_AA, last\_ASA, last\_NAOTAO  
-- [ ] somma atc su key\_anagrafe e data\_indice
+Il datamart ha due rappresentazioni complementari, entrambe autorevoli:
+- **`DATAMART-BUILDER.xlsx`** — la **specifica di selezione**, un foglio per flusso, colonna
+  `TENERE`: dichiara *quali* variabili l'assembler deve trattenere.
+- **`DATAMART_DAICHI-*.xlsx`** — il **datamart finale "flat"** di uno studio concreto: un
+  unico foglio con le colonne effettivamente consegnate. È il **modello** di come appare
+  l'output. Contiene già le variabili SCOREC (`SCOREC`, `risk_class_scorec`,
+  `flag_missing_scorec`) accanto a SCORE2, a conferma che l'EGP `SCOREC` è in produzione.
 
-## protocollo EPI4M
+---
 
-filtro date: (t2.data\_indice\<=t1.data\_prescrizione\<=t2.data\_indice+365)  
-in output:
+## Note di copertura
 
-- [ ] potenza ipolipemizzanti;   
-      - [ ] indice \[WHERE (t1.data\_indice \- 365 \< t1.data\_prescrizione \<= t1.data\_indice)\]   
-      - [ ] fup \[(t2.data\_indice \+ 30\*9 \<= t2.data\_prescrizione \<= t2.data\_indice \+ 30\*12 )\]  
-- [ ] Somma grezza degli ATC prescritti aggregati su key\_anagrafe
+Ricostruzione **statica** dalla pipeline di lineage (nessun accesso al server SAS). Robusta
+dove esiste una macro o un foglio datamart autorevole (IRC, laboratorio, eventi, terapia
+C@rdioNet, diagnosi aggregate); **best‑effort con nota ⚠︎** dove la ricetta è inline o priva
+di specifica datamart (prestazioni CUP, SCORE2/SCOREC, esami strumentali, COVID, RCVMA). Le
+liste variabili combaciano con i fogli `DATAMART-BUILDER.xlsx`; i filtri/soglie con i corpi
+delle macro.
 
-# cardio farma
+[^1]: Questi flussi sono accessibili solo da profilo SAS Aziendale.
 
-**Terapia C@rdioNet.** La terapia farmacologica registrata nella cartella cardiologica,
-aggregata in classi cardiologiche (ACE‑inibitori/sartani, betabloccanti, antiaggreganti,
-anticoagulanti, antidiabetici, calcio‑antagonisti, diuretici, ipolipemizzanti). Per ogni
-classe sono riportate la presenza, il codice ATC, il numero di confezioni, la quantità e
-la sostanza (`<classe>`, `_ATCCOD`, `_CONF`, `_QTA`, `_SOST`). Output
-`terapiacardionet`.
+[^2]: PNLAB è il laboratorio di Pordenone, importato nel DNLAB dal 2017. Prima del 2017 il DNLAB non ha Pordenone.
 
-[^1]:  Questi flussi sono accessibili solo da profilo SAS Aziendale.
-
-[^2]:  PNLAB e’ il laboratorio di Pordenone che e’ stato importato nel DNLAB dal 2017\. Prima del 2017 il DNLAB non ha Pordenone.
-
-[^3]:  AMBULATORIALE LV3 fa riferimento solo alla integrata DIALISI.
+[^3]: AMBULATORIALE LV3 fa riferimento solo alla integrata DIALISI.
