@@ -1252,6 +1252,68 @@ flowchart LR
   classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
 ```
 
+**Calcolo della potenza ipolipemizzante.** La "potenza" stima la **riduzione attesa
+dell'LDL** (frazione tra 0 e 1) prodotta dalla terapia in corso. Le prescrizioni sono
+prima classificate in cinque componenti, distinti in **orali** e **iniettivi**:
+
+- **orali:** **statine** (STA), **ezetimibe** (EZE), **acido bempedoico** (BEM);
+- **iniettivi:** **inclisiran** (INC) e **PCSK9‑inibitori** (PCS, gli "‑cumab").
+
+La potenza di una **statina** dipende dal tipo e dalla **quantità** (`QNT_STATINA`) a cinque
+scaglioni; i valori sono la % di riduzione dell'LDL:
+
+| Statina | ≤ 5 | 5–15 | 15–30 | 30–60 | > 60 |
+|---|---|---|---|---|---|
+| Fluvastatina | 15 | 19 | 23 | 27 | 32 |
+| Pravastatina | 18 | 22 | 26 | 30 | 34 |
+| Lovastatina | 19 | 23 | 28 | 33 | 37 |
+| Simvastatina | 23 | 28 | 34 | 38 | 42 |
+| Atorvastatina | 29 | 34 | 39 | 45 | 50 |
+| Rosuvastatina | 38 | 44 | 50 | 55 | 60 |
+
+Gli altri farmaci hanno una potenza **fissa**: ezetimibe **20%**, acido bempedoico
+**17,5%**, inclisiran **50%**, PCSK9‑inibitori **50%**.
+
+**Formula (moltiplicativa sul residuo).** Ogni farmaco lascia un LDL residuo pari a
+`(1 − p)`; la terapia combinata moltiplica i residui e la potenza complessiva è il
+complemento:
+
+```
+potenza = 1 − ∏ (1 − p_i)      per ogni farmaco i presente
+```
+
+Esempio: statina (pSTA) + ezetimibe (pEZE) → `potenza = 1 − (1 − pSTA)·(1 − pEZE)`. La
+formula è applicata esplicitamente per mono‑, doppia, tripla e quadrupla terapia.
+
+**Vincoli implementati.**
+- **Statina senza quantità → scartata:** la potenza statinica richiede `QNT_STATINA`; le
+  righe con statina ma quantità mancante sono rimosse.
+- **Iniettivi mutuamente esclusivi:** inclisiran e PCSK9‑inibitore **non possono coesistere**;
+  se compaiono entrambi si tiene solo il **più recente** per data di prescrizione (l'altro è
+  azzerato).
+- **Bempedoico senza statina:** in assenza di statina la potenza del bempedoico è maggiorata
+  (`1 − pBEM − 0.07`); in combinazione con una statina si usa il valore base (17,5%).
+- Per ogni componente si prende l'**ultima** prescrizione entro la finestra (per data indice).
+
+**Variabili derivate.** `terapia` = concatenazione dei farmaci presenti (es. `STA+EZE`);
+`llt` = 1 se in terapia ipolipemizzante (potenza ≥ 0); `llthi` = 1 se terapia ad **alta
+intensità** (potenza ≥ 0,5, cioè ≥ 50% di riduzione LDL attesa). Il calcolo è ripetuto
+**all'indice** e al **follow‑up**.
+
+```mermaid
+flowchart LR
+  presc[(prescrizioni ipolipemizzanti<br/>territoriali + aziendali)]:::l1 --> SPLIT{{classifica in 5 componenti}}:::tf
+  SPLIT --> OR[orali: STA per tipo+quantita<br/>EZE 20% · BEM 17,5%]:::l2
+  SPLIT --> IN{{iniettivi: INC 50% · PCS 50%<br/>mutex: tieni il piu recente}}:::tf --> INJ[INC oppure PCS]:::l2
+  OR --> F{{potenza = 1 - prodotto dei residui 1-p}}:::tf
+  INJ --> F
+  F --> OUT[potenza + llt + llthi<br/>indice e follow-up]:::out
+  classDef l1 fill:#d7f0d7,stroke:#4a9a4a,color:#111;
+  classDef l2 fill:#fff2cc,stroke:#c9a227,color:#111;
+  classDef tf fill:#ececec,stroke:#777,color:#111;
+  classDef out fill:#ffe0b3,stroke:#d98a2b,color:#111;
+```
+
 #### <ins>Terapia C@rdioNet</ins>
 
 La terapia farmacologica registrata nella cartella cardiologica, aggregata in classi
